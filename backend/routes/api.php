@@ -23,4 +23,23 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('purchases', PurchaseController::class);
 });
 
+Route::middleware('auth:sanctum')->group(function () {
+    Route::apiResource('sales',SaleController::class);
+});
+
+Route::middleware(['auth:sanctum'])->group(function () {
+
+    Route::apiResource('purchases', PurchaseController::class)
+        ->middleware('role:admin,manager,staff');
+
+    Route::apiResource('sales', SaleController::class)
+        ->middleware('role:admin,manager,staff');
+
+    Route::apiResource('products', ProductController::class)
+        ->middleware('role:admin,manager');
+
+    Route::apiResource('users', UserController::class)
+        ->middleware('role:admin');
+});
+
 
