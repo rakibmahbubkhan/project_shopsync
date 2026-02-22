@@ -13,6 +13,9 @@ use App\Services\StockService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Auth;
+use Barryvdh\DomPDF\Facade\Pdf;
+
 
 class SaleController extends Controller
 {
@@ -40,7 +43,8 @@ class SaleController extends Controller
     /**
      * Store a newly created sale.
      */
-    public function store(StoreSaleRequest $request): SaleResource|JsonResponse
+    
+    public function store(StoreSaleRequest $request)
     {
         try {
             return DB::transaction(function () use ($request) {
@@ -49,7 +53,7 @@ class SaleController extends Controller
                 // 1️⃣ Create Sale Header
                 $sale = Sale::create([
                     'customer_id'    => $request->customer_id,
-                    'created_by'     => auth()->id(),
+                    'created_by'     => Auth::id(),
                     'sale_date'      => $request->sale_date,
                     'payment_method' => $request->payment_method,
                     'payment_status' => $request->payment_status,
@@ -88,9 +92,22 @@ class SaleController extends Controller
 
                 $sale->update(['total_amount' => $finalTotal]);
 
-                return new SaleResource(
-                    $sale->load(['customer', 'items.product'])
-                );
+                // 4️⃣ Load relationships for receipt
+                $sale->load(['customer', 'items.product', 'user']);
+
+                // 5️⃣ Generate and return PDF
+                $pdf = PDF::loadView('receipts.sale', [
+                    'sale' => $sale,
+                    'company' => [
+                        'name' => config('app.name'),
+                        'address' => config('app.address', 'Your Company Address'),
+                        'phone' => config('app.phone', 'Your Phone'),
+                        'email' => config('app.email', 'your@email.com'),
+                        'tax_id' => config('app.tax_id', 'Your Tax ID')
+                    ]
+                ]);
+
+                return $pdf->download("receipt_{$sale->id}.pdf");
             });
         } catch (\Exception $e) {
             return response()->json([
@@ -98,7 +115,6 @@ class SaleController extends Controller
             ], 500);
         }
     }
-
     /**
      * Display the specified sale.
      */

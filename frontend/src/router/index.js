@@ -17,6 +17,11 @@ const routes = [
     path: "/login",
     component: () => import("@/layouts/AuthLayout.vue"),
   },
+  {
+    path: "/pos",
+    component: () => import("@/views/pos/POSView.vue"),
+    meta: { requiresAuth: true }
+  },
 ];
 
 const router = createRouter({
