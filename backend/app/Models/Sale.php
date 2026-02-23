@@ -35,5 +35,10 @@ class Sale extends Model
     {
         return $this->hasMany(SaleItem::class);
     }
+
+    public function warehouse()
+    {
+        return $this->belongsTo(Warehouse::class);
+    }
 }
 

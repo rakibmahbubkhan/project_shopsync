@@ -35,6 +35,10 @@ return new class extends Migration
         $table->index(['product_id', 'reference_type']);
 });
 
+        Schema::table('stock_logs', function (Blueprint $table) {
+            $table->unique(['product_id', 'warehouse_id']);
+        });
+
     }
 
     /**

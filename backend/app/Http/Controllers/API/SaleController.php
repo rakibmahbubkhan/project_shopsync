@@ -76,13 +76,15 @@ class SaleController extends Controller
                     ]);
 
                     // Decrease stock (will throw if insufficient)
-                    $this->stockService->decreaseStock(
-                        $item['product_id'],
-                        $item['quantity'],
-                        'sale',
-                        $sale->id,
-                        auth()->id()
-                    );
+                   $this->stockService->decreaseStock(
+                $item['product_id'],
+                $sale->warehouse_id,
+                $item['quantity'],
+                $item['selling_price'], // or cost price if tracking COGS
+                'sale',
+                $sale->id,
+                Auth::id()
+);
                 }
 
                 // 3️⃣ Calculate Final Total
@@ -137,13 +139,15 @@ class SaleController extends Controller
             return DB::transaction(function () use ($request, $sale) {
                 // 1️⃣ Restore stock from old items
                 foreach ($sale->items as $oldItem) {
-                    $this->stockService->increaseStock(
-                        $oldItem->product_id,
-                        $oldItem->quantity,
-                        'sale',
-                        $sale->id,
-                        auth()->id()
-                    );
+                $this->stockService->increaseStock(
+                    $oldItem->product_id,
+                    $sale->warehouse_id,
+                    $oldItem->quantity,
+                    $oldItem->selling_price,
+                    'sale_update_restore',
+                    $sale->id,
+                    auth()->id()
+                );
                 }
 
                 // 2️⃣ Delete old items
@@ -164,13 +168,15 @@ class SaleController extends Controller
                         'subtotal'      => $subtotal,
                     ]);
 
-                    $this->stockService->decreaseStock(
+                        $this->stockService->decreaseStock(
                         $item['product_id'],
+                        $sale->warehouse_id,
                         $item['quantity'],
-                        'sale',
+                        $item['selling_price'],
+                        'sale_update',
                         $sale->id,
-                        auth()->id()
-                    );
+                        Auth::id()
+                        );
                 }
 
                 // 4️⃣ Recalculate total
@@ -215,12 +221,14 @@ class SaleController extends Controller
                 // 1️⃣ Restore stock for all items
                 foreach ($sale->items as $item) {
                     $this->stockService->increaseStock(
-                        $item->product_id,
-                        $item->quantity,
-                        'sale',
-                        $sale->id,
-                        auth()->id()
-                    );
+                $item->product_id,
+                $sale->warehouse_id,
+                $item->quantity,
+                $item->selling_price,
+                'sale_delete_restore',
+                $sale->id,
+                Auth::id()
+                );
                 }
 
                 // 2️⃣ Delete sale (cascade deletes items)
@@ -250,5 +258,17 @@ class SaleController extends Controller
         if ($sale->payment_status === 'paid') {
             throw new \Exception('Paid sales cannot be modified.');
         }
+    }
+
+
+    public function receipt(Sale $sale)
+    {
+        $sale->load('items.product');
+
+        $pdf = Pdf::loadView('receipts.sale', [
+            'sale' => $sale
+        ]);
+
+        return $pdf->stream("receipt_{$sale->id}.pdf");
     }
 }

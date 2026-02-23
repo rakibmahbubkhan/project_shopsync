@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\StockLog;
 use App\Models\InventoryLedger;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -54,7 +55,7 @@ class StockService
                 'balance_after'  => $stock->quantity,
                 'unit_cost'      => $unitCost,
                 'total_cost'     => $quantity * $unitCost,
-                'user_id'        => $userId ?? auth()->id(),
+                'user_id'        => $userId ?? Auth::id(),
             ]);
         });
     }
@@ -85,6 +86,7 @@ class StockService
             // Get stock record for this product in this warehouse
             $stock = StockLog::where('product_id', $productId)
                 ->where('warehouse_id', $warehouseId)
+                ->lockForUpdate()
                 ->first();
 
             // Validate stock exists
@@ -119,7 +121,7 @@ class StockService
                 'balance_after'  => $stock->quantity,
                 'unit_cost'      => $unitCost,
                 'total_cost'     => $quantity * $unitCost,
-                'user_id'        => $userId ?? auth()->id(),
+                'user_id'        => $userId ?? Auth::id(),
             ]);
         });
     }
@@ -178,6 +180,7 @@ class StockService
     {
         $stock = StockLog::where('product_id', $productId)
             ->where('warehouse_id', $warehouseId)
+            ->lockForUpdate()
             ->first();
 
         return $stock ? $stock->quantity : 0;

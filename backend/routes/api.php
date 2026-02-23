@@ -73,6 +73,9 @@ use App\Http\Controllers\API\FinancialReportController;
     Route::get('/financial/profit-loss', [FinancialReportController::class, 'profitLoss']);
     Route::get('/financial/balance-sheet', [FinancialReportController::class, 'balanceSheet']);
 
+    Route::middleware('auth:sanctum')
+    ->get('/sales/{sale}/receipt', [SaleController::class, 'receipt']);
+
 
 
 
