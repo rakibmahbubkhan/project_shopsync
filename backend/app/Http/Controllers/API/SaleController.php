@@ -45,78 +45,110 @@ class SaleController extends Controller
      */
     
     public function store(StoreSaleRequest $request)
-    {
-        try {
-            return DB::transaction(function () use ($request) {
-                $subtotalTotal = 0;
+{
+    try {
+        return DB::transaction(function () use ($request) {
 
-                // 1️⃣ Create Sale Header
-                $sale = Sale::create([
-                    'customer_id'    => $request->customer_id,
-                    'created_by'     => Auth::id(),
-                    'sale_date'      => $request->sale_date,
-                    'payment_method' => $request->payment_method,
-                    'payment_status' => $request->payment_status,
-                    'discount'       => $request->discount ?? 0,
-                    'tax'            => $request->tax ?? 0,
-                    'total_amount'   => 0
+            $subtotalTotal = 0;
+            $totalCogs = 0;
+            $totalGrossProfit = 0;
+
+            // 1️⃣ Create Sale Header
+            $sale = Sale::create([
+                'customer_id'    => $request->customer_id,
+                'warehouse_id'   => $request->warehouse_id,
+                'created_by'     => Auth::id(),
+                'sale_date'      => $request->sale_date,
+                'payment_method' => $request->payment_method,
+                'payment_status' => $request->payment_status,
+                'discount'       => $request->discount ?? 0,
+                'tax'            => $request->tax ?? 0,
+                'total_amount'   => 0,
+                'total_cogs'     => 0,
+                'gross_profit'   => 0,
+            ]);
+
+            // 2️⃣ Process Each Item
+            foreach ($request->items as $item) {
+
+                // Get average cost (COGS base)
+                $costPrice = $this->stockService->getAverageCost(
+                    $item['product_id'],
+                    $sale->warehouse_id
+                );
+
+                // Calculations
+                $quantity = $item['quantity'];
+                $sellingPrice = $item['selling_price'];
+
+                $subtotal = $quantity * $sellingPrice;
+                $cogs = $quantity * $costPrice;
+                $grossProfit = $subtotal - $cogs;
+
+                $subtotalTotal += $subtotal;
+                $totalCogs += $cogs;
+                $totalGrossProfit += $grossProfit;
+
+                // Create Sale Item
+                SaleItem::create([
+                    'sale_id'       => $sale->id,
+                    'product_id'    => $item['product_id'],
+                    'quantity'      => $quantity,
+                    'selling_price' => $sellingPrice,
+                    'cost_price'    => $costPrice,
+                    'subtotal'      => $subtotal,
+                    'gross_profit'  => $grossProfit,
                 ]);
 
-                // 2️⃣ Insert Items & Decrease Stock
-                foreach ($request->items as $item) {
-                    $subtotal = $item['quantity'] * $item['selling_price'];
-                    $subtotalTotal += $subtotal;
+                // 3️⃣ Decrease Stock (Correct Parameter Order)
+                $this->stockService->decreaseStock(
+                    $item['product_id'],
+                    $sale->warehouse_id,
+                    $quantity,
+                    $costPrice,
+                    'sale',
+                    $sale->id,
+                    Auth::id()
+                );
+            }
 
-                    SaleItem::create([
-                        'sale_id'       => $sale->id,
-                        'product_id'    => $item['product_id'],
-                        'quantity'      => $item['quantity'],
-                        'selling_price' => $item['selling_price'],
-                        'subtotal'      => $subtotal,
-                    ]);
+            // 4️⃣ Calculate Final Total
+            $finalTotal = $subtotalTotal
+                - ($request->discount ?? 0)
+                + ($request->tax ?? 0);
 
-                    // Decrease stock (will throw if insufficient)
-                   $this->stockService->decreaseStock(
-                $item['product_id'],
-                $sale->warehouse_id,
-                $item['quantity'],
-                $item['selling_price'], // or cost price if tracking COGS
-                'sale',
-                $sale->id,
-                Auth::id()
-);
-                }
+            // 5️⃣ Update Sale Header with Financial Data
+            $sale->update([
+                'total_amount' => $finalTotal,
+                'total_cogs'   => $totalCogs,
+                'gross_profit' => $totalGrossProfit,
+            ]);
 
-                // 3️⃣ Calculate Final Total
-                $finalTotal = $subtotalTotal 
-                    - ($request->discount ?? 0) 
-                    + ($request->tax ?? 0);
+            // 6️⃣ Load relationships for receipt
+            $sale->load(['customer', 'items.product', 'user', 'warehouse']);
 
-                $sale->update(['total_amount' => $finalTotal]);
+            // 7️⃣ Generate Receipt PDF
+            $pdf = Pdf::loadView('receipts.sale', [
+                'sale' => $sale,
+                'company' => [
+                    'name'    => config('app.name'),
+                    'address' => config('app.address', 'Your Company Address'),
+                    'phone'   => config('app.phone', 'Your Phone'),
+                    'email'   => config('app.email', 'your@email.com'),
+                    'tax_id'  => config('app.tax_id', 'Your Tax ID'),
+                ]
+            ]);
 
-                // 4️⃣ Load relationships for receipt
-                $sale->load(['customer', 'items.product', 'user']);
+            return $pdf->download("receipt_{$sale->id}.pdf");
+        });
 
-                // 5️⃣ Generate and return PDF
-                $pdf = PDF::loadView('receipts.sale', [
-                    'sale' => $sale,
-                    'company' => [
-                        'name' => config('app.name'),
-                        'address' => config('app.address', 'Your Company Address'),
-                        'phone' => config('app.phone', 'Your Phone'),
-                        'email' => config('app.email', 'your@email.com'),
-                        'tax_id' => config('app.tax_id', 'Your Tax ID')
-                    ]
-                ]);
+    } catch (\Exception $e) {
 
-                return $pdf->download("receipt_{$sale->id}.pdf");
-            });
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to create sale: ' . $e->getMessage()
-            ], 500);
-        }
+        return response()->json([
+            'message' => 'Failed to create sale: ' . $e->getMessage()
+        ], 500);
     }
+}
     /**
      * Display the specified sale.
      */

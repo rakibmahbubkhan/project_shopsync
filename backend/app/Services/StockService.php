@@ -222,4 +222,15 @@ class StockService
 
         return $query->paginate(15);
     }
+
+    public function getAverageCost(int $productId, int $warehouseId): float
+    {
+        $latestIn = InventoryLedger::where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->where('movement_type', 'in')
+            ->latest()
+            ->first();
+
+        return $latestIn ? $latestIn->unit_cost : 0;
+    }
 }
