@@ -76,6 +76,8 @@ use App\Http\Controllers\API\FinancialReportController;
     Route::middleware('auth:sanctum')
     ->get('/sales/{sale}/receipt', [SaleController::class, 'receipt']);
 
+    Route::get('/returns/{return}/receipt', [SaleController::class, 'returnReceipt']);
+
 
 
 

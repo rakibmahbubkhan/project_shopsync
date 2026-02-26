@@ -7,6 +7,8 @@ use App\Models\InventoryLedger;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use App\Models\Sale;
+use App\Models\SaleReturn;
 
 class StockService
 {
@@ -233,4 +235,56 @@ class StockService
 
         return $latestIn ? $latestIn->unit_cost : 0;
     }
+
+    public function processSaleReturn(
+    Sale $sale,
+    int $productId,
+    int $quantity,
+    int $userId
+): void {
+
+    $item = $sale->items()
+        ->where('product_id', $productId)
+        ->firstOrFail();
+
+    if ($quantity > $item->quantity) {
+        throw ValidationException::withMessages([
+            'quantity' => 'Return quantity exceeds sold quantity.'
+        ]);
+    }
+
+    DB::transaction(function () use ($sale, $item, $quantity, $userId) {
+
+        $refundAmount = $quantity * $item->selling_price;
+        $cogsReversal = $quantity * $item->cost_price;
+        $profitReversal = $refundAmount - $cogsReversal;
+
+        // 1️⃣ Restore Stock
+        $this->increaseStock(
+            $item->product_id,
+            $sale->warehouse_id,
+            $quantity,
+            $item->cost_price,
+            'sale_return',
+            $sale->id,
+            $userId
+        );
+
+        // 2️⃣ Create Return Record
+        SaleReturn::create([
+            'sale_id'        => $sale->id,
+            'product_id'     => $item->product_id,
+            'quantity'       => $quantity,
+            'refund_amount'  => $refundAmount,
+            'cost_price'     => $item->cost_price,
+            'profit_reversed'=> $profitReversal,
+            'processed_by'   => $userId,
+        ]);
+
+        // 3️⃣ Update Sale Totals
+        $sale->decrement('total_amount', $refundAmount);
+        $sale->decrement('total_cogs', $cogsReversal);
+        $sale->decrement('gross_profit', $profitReversal);
+    });
+}
 }

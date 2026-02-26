@@ -22,6 +22,11 @@ const routes = [
     component: () => import("@/views/pos/POSView.vue"),
     meta: { requiresAuth: true }
   },
+  {
+    path: '/sales',
+    name: 'sales',
+    component: () => import('@/views/sales/SalesListView.vue')
+  },
 ];
 
 const router = createRouter({

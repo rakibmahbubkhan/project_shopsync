@@ -24,3 +24,33 @@ php artisan migrate
 cd frontend
 npm install
 npm run dev
+
+
+
+Core Modules
+
+Dashboard
+
+Sales
+
+POS
+
+Returns
+
+Products
+
+Categories
+
+Warehouses
+
+Inventory
+
+Transfers
+
+Customers
+
+Expenses
+
+Reports
+
+Settings

@@ -9,12 +9,15 @@ use App\Http\Resources\SaleResource;
 use App\Http\Resources\SaleCollection;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Models\Refund;
+use App\Models\SaleReturn;
 use App\Services\StockService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Request;
 
 
 class SaleController extends Controller
@@ -155,7 +158,13 @@ class SaleController extends Controller
     public function show(Sale $sale): SaleResource
     {
         return new SaleResource(
-            $sale->load(['customer', 'user', 'items.product'])
+            $sale->load([
+                'customer',
+                'user',
+                'warehouse',
+                'items.product',
+                'returns.product',   
+            ])
         );
     }
 
@@ -178,7 +187,7 @@ class SaleController extends Controller
                     $oldItem->selling_price,
                     'sale_update_restore',
                     $sale->id,
-                    auth()->id()
+                    Auth::id()
                 );
                 }
 
@@ -303,4 +312,69 @@ class SaleController extends Controller
 
         return $pdf->stream("receipt_{$sale->id}.pdf");
     }
+
+    public function returnItem(Request $request, Sale $sale)
+    {
+        $request->validate([
+            'product_id'     => 'required|exists:products,id',
+            'quantity'       => 'required|integer|min:1',
+            'payment_method' => 'required|in:cash,card,wallet',
+        ]);
+
+        DB::transaction(function () use ($request, $sale) {
+
+            $return = $this->stockService->processSaleReturn(
+                $sale,
+                $request->product_id,
+                $request->quantity,
+                Auth::id()
+            );
+
+            // Create Refund Record
+            Refund::create([
+                'sale_return_id' => $return->id,
+                'payment_method' => $request->payment_method,
+                'amount'         => $request->quantity * $return->cost_price,
+                'processed_by'   => Auth::id(),
+            ]);
+        });
+
+        $sale->load([
+            'customer',
+            'warehouse',
+            'items.product',
+            'returns.product',
+            'returns.refund' // eager load
+        ]);
+
+        return response()->json([
+            'message' => 'Return processed successfully',
+            'sale' => new SaleResource($sale)
+        ]);
+    }
+
+    public function returnReceipt(SaleReturn $return)
+    {
+        $return->load([
+            'sale.customer',
+            'sale.warehouse',
+            'product',
+            'processedBy'
+        ]);
+
+        $pdf = Pdf::loadView('receipts.return', [
+            'return' => $return,
+            'company' => [
+                'name'    => config('app.name'),
+                'address' => config('app.address', 'Your Company Address'),
+                'phone'   => config('app.phone', 'Your Phone'),
+                'email'   => config('app.email', 'your@email.com'),
+                'tax_id'  => config('app.tax_id', 'Your Tax ID'),
+            ]
+        ]);
+
+        return $pdf->download("return_receipt_{$return->id}.pdf");
+    }
+
+    
 }
