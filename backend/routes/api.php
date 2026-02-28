@@ -79,7 +79,7 @@ use App\Http\Controllers\API\FinancialReportController;
     Route::get('/returns/{return}/receipt', [SaleController::class, 'returnReceipt']);
 
 
-
+    Route::post('/returns/{return}/approve', [SaleController::class, 'approve']);
 
 
 

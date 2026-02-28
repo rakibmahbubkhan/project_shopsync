@@ -19,6 +19,7 @@
             <th class="p-2 text-left">Returned</th>
             <th class="p-2 text-left">Remaining</th>
             <th class="p-2 text-left">Return Qty</th>
+            <th class="p-2 text-left">Reason</th>
             <th class="p-2 text-left">Payment Method</th>
             <th class="p-2 text-left">Action</th>
           </tr>
@@ -47,6 +48,21 @@
                 class="border p-1 w-20 rounded"
                 :disabled="getRemainingQty(item) === 0"
               />
+            </td>
+            <td class="p-2">
+              <select
+                v-model="returnReasons[item.product_id]"
+                class="border p-1 rounded min-w-[120px]"
+                :disabled="getRemainingQty(item) === 0"
+              >
+                <option value="">Select reason</option>
+                <option value="damaged">Damaged</option>
+                <option value="wrong_item">Wrong Item</option>
+                <option value="customer_request">Customer Request</option>
+                <option value="expired">Expired</option>
+                <option value="defective">Defective</option>
+                <option value="other">Other</option>
+              </select>
             </td>
             <td class="p-2">
               <select
@@ -81,6 +97,8 @@
             <tr>
               <th class="p-2 text-left">Product</th>
               <th class="p-2 text-left">Qty</th>
+              <th class="p-2 text-left">Reason</th>
+              <th class="p-2 text-left">Status</th>
               <th class="p-2 text-left">Amount</th>
               <th class="p-2 text-left">Payment Method</th>
               <th class="p-2 text-left">Processed By</th>
@@ -92,26 +110,37 @@
             <tr 
               v-for="ret in sale.returns" 
               :key="ret.id" 
-              v-if="ret.refund"
             >
               <td class="p-2">{{ ret.product.name }}</td>
               <td class="p-2">{{ ret.quantity }}</td>
-              <td class="p-2 text-red-600">৳ {{ ret.refund.amount }}</td>
-              <td class="p-2">{{ ret.refund.payment_method }}</td>
-              <td class="p-2">{{ ret.refund.processed_by }}</td>
-              <td class="p-2">{{ formatDate(ret.refund.created_at) }}</td>
+              <td class="p-2">
+                <span class="capitalize">{{ formatReason(ret.reason || 'N/A') }}</span>
+              </td>
+              <td class="p-2">
+                <span 
+                  class="px-2 py-1 rounded-full text-xs font-semibold"
+                  :class="getStatusClass(ret.status)"
+                >
+                  {{ ret.status || 'pending' }}
+                </span>
+              </td>
+              <td class="p-2 text-red-600">৳ {{ ret.refund?.amount || 'N/A' }}</td>
+              <td class="p-2">{{ ret.refund?.payment_method || 'N/A' }}</td>
+              <td class="p-2">{{ ret.refund?.processed_by || 'N/A' }}</td>
+              <td class="p-2">{{ formatDate(ret.refund?.created_at || ret.created_at) }}</td>
               <td class="p-2">
                 <button
                   @click="printReturn(ret.id)"
                   class="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700"
+                  :disabled="ret.status !== 'approved'"
                 >
                   Print Receipt
                 </button>
               </td>
             </tr>
-            <tr v-if="!sale.returns?.filter(r => r.refund).length">
-              <td colspan="7" class="p-4 text-center text-gray-500">
-                No refunds processed yet
+            <tr v-if="!sale.returns?.length">
+              <td colspan="9" class="p-4 text-center text-gray-500">
+                No returns processed yet
               </td>
             </tr>
           </tbody>
@@ -162,12 +191,38 @@ const props = defineProps({
 const emit = defineEmits(['close', 'refresh'])
 
 const returnQuantities = reactive({})
+const returnReasons = reactive({})
 const paymentMethods = reactive({})
 
 // Helper function to format dates
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A'
   return new Date(dateString).toLocaleString()
+}
+
+// Format reason for display
+const formatReason = (reason) => {
+  const reasonMap = {
+    'damaged': 'Damaged',
+    'wrong_item': 'Wrong Item',
+    'customer_request': 'Customer Request',
+    'expired': 'Expired',
+    'defective': 'Defective',
+    'other': 'Other'
+  }
+  return reasonMap[reason] || reason
+}
+
+// Get status class for styling
+const getStatusClass = (status) => {
+  const statusClasses = {
+    'pending': 'bg-yellow-100 text-yellow-800',
+    'approved': 'bg-green-100 text-green-800',
+    'rejected': 'bg-red-100 text-red-800',
+    'completed': 'bg-blue-100 text-blue-800',
+    'cancelled': 'bg-gray-100 text-gray-800'
+  }
+  return statusClasses[status?.toLowerCase()] || 'bg-gray-100 text-gray-800'
 }
 
 // Get total returned quantity for a product
@@ -187,11 +242,17 @@ const getRemainingQty = (item) => {
 // Process return
 const returnItem = async (item) => {
   const quantity = returnQuantities[item.product_id]
+  const reason = returnReasons[item.product_id]
   const paymentMethod = paymentMethods[item.product_id]
 
   // Validation
   if (!quantity || quantity <= 0) {
     alert("Enter valid quantity")
+    return
+  }
+
+  if (!reason) {
+    alert("Select return reason")
     return
   }
 
@@ -209,6 +270,7 @@ const returnItem = async (item) => {
     const res = await api.post(`/sales/${props.sale.id}/return`, {
       product_id: item.product_id,
       quantity,
+      reason: returnReasons[item.product_id],
       payment_method: paymentMethod || 'cash'
     })
 
@@ -217,8 +279,9 @@ const returnItem = async (item) => {
     // Update sale live with the returned data
     Object.assign(props.sale, res.data.sale.data)
 
-    // Reset input and payment method
+    // Reset input, reason and payment method
     returnQuantities[item.product_id] = null
+    returnReasons[item.product_id] = ''
     paymentMethods[item.product_id] = 'cash'
 
     // Notify parent to refresh data
@@ -230,14 +293,9 @@ const returnItem = async (item) => {
 }
 
 // Print return receipt
-
-
-
 const printReturn = (returnId) => {
-  // You can implement this in different ways:
+  const returnItem = props.sale.returns.find(r => r.id === returnId)
   
-  // Option 1: Open a new window with printable receipt
-  window.open(`/api/returns/${returnId}/receipt`, '_blank')
   const printWindow = window.open('', '_blank')
   printWindow.document.write(`
     <html>
@@ -247,10 +305,20 @@ const printReturn = (returnId) => {
           body { font-family: Arial, sans-serif; padding: 20px; }
           .receipt { max-width: 300px; margin: 0 auto; }
           .header { text-align: center; margin-bottom: 20px; }
+          .status-badge { 
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 9999px;
+            font-size: 12px;
+            font-weight: 600;
+            background-color: ${returnItem?.status === 'approved' ? '#dcfce7' : '#fef9c3'};
+            color: ${returnItem?.status === 'approved' ? '#166534' : '#854d0e'};
+          }
           .details { margin-bottom: 20px; }
           .items { width: 100%; border-collapse: collapse; }
           .items th, .items td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
           .total { text-align: right; margin-top: 20px; font-weight: bold; }
+          .reason { margin-top: 10px; padding: 8px; background-color: #f3f4f6; border-radius: 4px; }
         </style>
       </head>
       <body>
@@ -259,6 +327,7 @@ const printReturn = (returnId) => {
             <h2>Return Receipt</h2>
             <p>Receipt #: ${returnId}</p>
             <p>Date: ${new Date().toLocaleString()}</p>
+            <div class="status-badge">${returnItem?.status || 'pending'}</div>
           </div>
           <div class="details">
             <p><strong>Sale #:</strong> ${props.sale.id}</p>
@@ -283,6 +352,9 @@ const printReturn = (returnId) => {
                 `).join('')}
             </tbody>
           </table>
+          <div class="reason">
+            <strong>Return Reason:</strong> ${formatReason(returnItem?.reason || 'N/A')}
+          </div>
           <div class="total">
             Total Refund: ৳ ${props.sale.returns
               .filter(r => r.id === returnId)
@@ -296,17 +368,15 @@ const printReturn = (returnId) => {
     </html>
   `)
   printWindow.document.close()
-  
-  // Option 2: If you have a dedicated API endpoint for printing receipts
-  // window.open(`/api/returns/${returnId}/print`, '_blank')
-  
-  // Option 3: Emit event to parent component to handle printing
-  // emit('print-return', returnId)
 }
 </script>
 
 <style scoped>
 .fixed {
   z-index: 1000;
+}
+
+.capitalize {
+  text-transform: capitalize;
 }
 </style>

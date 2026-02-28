@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use App\Models\Sale;
 use App\Models\SaleReturn;
+Stock
 
 class StockService
 {
@@ -236,55 +237,110 @@ class StockService
         return $latestIn ? $latestIn->unit_cost : 0;
     }
 
-    public function processSaleReturn(
-    Sale $sale,
-    int $productId,
-    int $quantity,
-    int $userId
-): void {
+    public function processSaleReturn(Sale $sale, int $productId, int $quantity, int $userId): void 
+    {
 
-    $item = $sale->items()
-        ->where('product_id', $productId)
-        ->firstOrFail();
+        $item = $sale->items()
+            ->where('product_id', $productId)
+            ->firstOrFail();
 
-    if ($quantity > $item->quantity) {
-        throw ValidationException::withMessages([
-            'quantity' => 'Return quantity exceeds sold quantity.'
+        if ($quantity > $item->quantity) {
+            throw ValidationException::withMessages([
+                'quantity' => 'Return quantity exceeds sold quantity.'
+            ]);
+        }
+
+        DB::transaction(function () use ($sale, $item, $quantity, $userId) {
+
+            $refundAmount = $quantity * $item->selling_price;
+            $cogsReversal = $quantity * $item->cost_price;
+            $profitReversal = $refundAmount - $cogsReversal;
+
+            // 1️⃣ Restore Stock
+            $this->increaseStock(
+                $item->product_id,
+                $sale->warehouse_id,
+                $quantity,
+                $item->cost_price,
+                'sale_return',
+                $sale->id,
+                $userId
+            );
+
+            // 2️⃣ Create Return Record
+            SaleReturn::create([
+                'sale_id'        => $sale->id,
+                'product_id'     => $item->product_id,
+                'quantity'       => $quantity,
+                'refund_amount'  => $refundAmount,
+                'cost_price'     => $item->cost_price,
+                'profit_reversed'=> $profitReversal,
+                'processed_by'   => $userId,
+            ]);
+
+            // 3️⃣ Update Sale Totals
+            $sale->decrement('total_amount', $refundAmount);
+            $sale->decrement('total_cogs', $cogsReversal);
+            $sale->decrement('gross_profit', $profitReversal);
+        });
+    }
+
+    public function prepareSaleReturn(Sale $sale,int $productId,int $quantity,int $userId,string $reason): SaleReturn 
+    {
+        $saleItem = $sale->items()
+            ->where('product_id', $productId)
+            ->firstOrFail();
+
+        // Calculate already returned qty
+        $alreadyReturned = $sale->returns()
+            ->where('product_id', $productId)
+            ->sum('quantity');
+
+        $remainingQty = $saleItem->quantity - $alreadyReturned;
+
+        if ($quantity > $remainingQty) {
+            throw new \Exception('Return quantity exceeds remaining quantity.');
+        }
+
+        $refundAmount = $quantity * $saleItem->unit_price;
+
+        return SaleReturn::create([
+            'sale_id'       => $sale->id,
+            'product_id'    => $productId,
+            'quantity'      => $quantity,
+            'reason'        => $reason,
+            'refund_amount' => $refundAmount,
+            'processed_by'  => $userId,
+            'status'        => 'pending'
         ]);
     }
 
-    DB::transaction(function () use ($sale, $item, $quantity, $userId) {
+    public function finalizeSaleReturn(SaleReturn $return): void
+    {
+        $sale = $return->sale;
+        $productId = $return->product_id;
+        $quantity = $return->quantity;
 
-        $refundAmount = $quantity * $item->selling_price;
-        $cogsReversal = $quantity * $item->cost_price;
-        $profitReversal = $refundAmount - $cogsReversal;
+        $saleItem = $sale->items()
+            ->where('product_id', $productId)
+            ->firstOrFail();
 
-        // 1️⃣ Restore Stock
-        $this->increaseStock(
-            $item->product_id,
-            $sale->warehouse_id,
-            $quantity,
-            $item->cost_price,
-            'sale_return',
-            $sale->id,
-            $userId
-        );
+        // 1️⃣ Restore stock
 
-        // 2️⃣ Create Return Record
-        SaleReturn::create([
-            'sale_id'        => $sale->id,
-            'product_id'     => $item->product_id,
-            'quantity'       => $quantity,
-            'refund_amount'  => $refundAmount,
-            'cost_price'     => $item->cost_price,
-            'profit_reversed'=> $profitReversal,
-            'processed_by'   => $userId,
+        Product::where('id', $productId)->increment('quantity', $quantity);
+
+
+        // 2️⃣ Adjust sale totals
+        $sale->decrement('total_amount', $return->refund_amount);
+
+        $cogsReduction = $quantity * $saleItem->cost_price;
+        $sale->decrement('total_cogs', $cogsReduction);
+        $sale->decrement('gross_profit', $return->refund_amount - $cogsReduction);
+
+        // 3️⃣ Mark return approved
+        $return->update([
+            'status' => 'approved',
+            'approved_at' => now(),
         ]);
-
-        // 3️⃣ Update Sale Totals
-        $sale->decrement('total_amount', $refundAmount);
-        $sale->decrement('total_cogs', $cogsReversal);
-        $sale->decrement('gross_profit', $profitReversal);
-    });
-}
+    }
 }

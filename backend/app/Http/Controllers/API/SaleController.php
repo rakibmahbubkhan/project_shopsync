@@ -319,36 +319,37 @@ class SaleController extends Controller
             'product_id'     => 'required|exists:products,id',
             'quantity'       => 'required|integer|min:1',
             'payment_method' => 'required|in:cash,card,wallet',
+            'reason'         => 'required|string|max:255',
         ]);
 
         DB::transaction(function () use ($request, $sale) {
 
-            $return = $this->stockService->processSaleReturn(
+            $return = $this->stockService->prepareSaleReturn(
                 $sale,
                 $request->product_id,
                 $request->quantity,
-                Auth::id()
+                Auth::id(),
+                $request->reason
             );
 
-            // Create Refund Record
-            Refund::create([
-                'sale_return_id' => $return->id,
-                'payment_method' => $request->payment_method,
-                'amount'         => $request->quantity * $return->cost_price,
-                'processed_by'   => Auth::id(),
-            ]);
+            $refundAmount = $return->refund_amount;
+
+            if ($refundAmount > config('pos.return_approval_threshold')) {
+
+                $return->update([
+                    'status' => 'pending'
+                ]);
+
+            } else {
+
+                $this->approveReturn($return, Auth::id());
+            }
         });
 
-        $sale->load([
-            'customer',
-            'warehouse',
-            'items.product',
-            'returns.product',
-            'returns.refund' // eager load
-        ]);
+        $sale->load(['returns.product','returns.refund']);
 
         return response()->json([
-            'message' => 'Return processed successfully',
+            'message' => 'Return submitted',
             'sale' => new SaleResource($sale)
         ]);
     }
@@ -374,6 +375,38 @@ class SaleController extends Controller
         ]);
 
         return $pdf->download("return_receipt_{$return->id}.pdf");
+    }
+
+    public function approveReturn(SaleReturn $return, $managerId)
+    {
+        $return->update([
+            'status' => 'approved',
+            'approved_by' => $managerId,
+            'approved_at' => now()
+        ]);
+
+        // Now finalize stock + ledger
+        $this->stockService->finalizeSaleReturn($return);
+
+        Refund::create([
+            'sale_return_id' => $return->id,
+            'payment_method' => $return->payment_method,
+            'amount'         => $return->refund_amount,
+            'processed_by'   => $managerId,
+        ]);
+    }
+
+    public function approve(SaleReturn $return)
+    {
+        if (!Auth::user()->can('approve_return')) {
+            abort(403);
+        }
+
+        DB::transaction(function () use ($return) {
+            $this->approveReturn($return, Auth::id());
+        });
+
+        return response()->json(['message' => 'Return approved']);
     }
 
     
