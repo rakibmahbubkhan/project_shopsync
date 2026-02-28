@@ -8,8 +8,11 @@ class Sale extends Model
 {
     protected $fillable = [
         'customer_id',
+        'warehouse_id', // Added
         'created_by',
         'total_amount',
+        'total_cogs',   // Added
+        'gross_profit', // Added
         'discount',
         'tax',
         'payment_method',

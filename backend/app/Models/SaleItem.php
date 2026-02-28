@@ -13,7 +13,9 @@ class SaleItem extends Model
         'product_id',
         'quantity',
         'selling_price',
-        'subtotal'
+        'cost_price',   // Added
+        'subtotal',
+        'gross_profit', // Added
     ];
 
     public function sale()

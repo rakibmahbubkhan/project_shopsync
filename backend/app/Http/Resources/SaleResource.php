@@ -2,33 +2,33 @@
 
 namespace App\Http\Resources;
 
-use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class SaleResource extends JsonResource
 {
-    public function toArray(Request $request): array
+    public function toArray($request)
     {
         return [
             'id' => $this->id,
-            'customer' => $this->customer?->name,
-            'created_by' => $this->user->name,
+            'customer_id' => $this->customer_id,
+            'warehouse_id' => $this->warehouse_id,
+            'created_by' => $this->created_by,
             'sale_date' => $this->sale_date,
             'payment_method' => $this->payment_method,
             'payment_status' => $this->payment_status,
             'discount' => $this->discount,
             'tax' => $this->tax,
             'total_amount' => $this->total_amount,
-            'items' => $this->items->map(function ($item) {
-                return [
-                    'product' => $item->product->name,
-                    'quantity' => $item->quantity,
-                    'selling_price' => $item->selling_price,
-                    'subtotal' => $item->subtotal
-                ];
-            }),
+            'total_cogs' => $this->total_cogs,
+            'gross_profit' => $this->gross_profit,
             'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
+            
+            // Relationships
+            // 'customer' => new CustomerResource($this->whenLoaded('customer')),
+            // 'items' => SaleItemResource::collection($this->whenLoaded('items')),
+            // 'user' => new UserResource($this->whenLoaded('user')),
+            // 'warehouse' => new WarehouseResource($this->whenLoaded('warehouse')),
         ];
     }
 }
-

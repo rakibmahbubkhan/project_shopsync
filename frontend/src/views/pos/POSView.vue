@@ -44,8 +44,51 @@
         Cart
       </h2>
 
+      <!-- Customer, Warehouse, Payment Selection -->
+      <div class="mb-4 space-y-3">
+        <div>
+          <label class="text-xs font-semibold text-gray-500 uppercase block mb-1">Customer</label>
+          <select 
+            v-model="selectedCustomer" 
+            class="w-full border rounded p-2 text-sm bg-white"
+            required
+          >
+            <option value="" disabled>Select customer</option>
+            <option v-for="c in customers" :key="c.id" :value="c.id">
+              {{ c.name }}
+            </option>
+          </select>
+        </div>
+        
+        <div>
+          <label class="text-xs font-semibold text-gray-500 uppercase block mb-1">Warehouse</label>
+          <select 
+            v-model="selectedWarehouse" 
+            class="w-full border rounded p-2 text-sm bg-white"
+            required
+          >
+            <option value="" disabled>Select warehouse</option>
+            <option v-for="w in warehouses" :key="w.id" :value="w.id">
+              {{ w.name }}
+            </option>
+          </select>
+        </div>
+
+        <div>
+          <label class="text-xs font-semibold text-gray-500 uppercase block mb-1">Payment Method</label>
+          <select 
+            v-model="paymentMethod" 
+            class="w-full border rounded p-2 text-sm bg-white"
+          >
+            <option value="cash">Cash</option>
+            <option value="card">Card</option>
+            <option value="wallet">Mobile Wallet</option>
+          </select>
+        </div>
+      </div>
+
       <!-- Cart Items -->
-      <div class="flex-1 overflow-y-auto">
+      <div class="flex-1 overflow-y-auto border-t pt-4">
 
         <div
           v-for="item in cart"
@@ -60,28 +103,32 @@
             <div class="flex items-center gap-2 mt-1">
               <button
                 @click="decreaseQty(item)"
-                class="px-2 bg-gray-200 rounded"
+                class="px-2 bg-gray-200 rounded hover:bg-gray-300"
               >-</button>
 
               <span>{{ item.quantity }}</span>
 
               <button
                 @click="increaseQty(item)"
-                class="px-2 bg-gray-200 rounded"
+                class="px-2 bg-gray-200 rounded hover:bg-gray-300"
               >+</button>
             </div>
 
             <p class="text-sm text-gray-500">
-              ৳ {{ item.selling_price }}
+              ৳ {{ item.selling_price }} each
             </p>
           </div>
 
           <button
             @click="removeFromCart(item.id)"
-            class="text-red-500 font-bold"
+            class="text-red-500 font-bold hover:text-red-700"
           >
             ✕
           </button>
+        </div>
+
+        <div v-if="cart.length === 0" class="text-center text-gray-400 py-8">
+          Cart is empty
         </div>
 
       </div>
@@ -105,8 +152,8 @@
 
         <button
           @click="checkout"
-          :disabled="cart.length === 0 || loading"
-          class="w-full bg-blue-600 text-white py-3 rounded-lg mt-3 hover:bg-blue-700 transition"
+          :disabled="cart.length === 0 || loading || !selectedCustomer || !selectedWarehouse"
+          class="w-full bg-blue-600 text-white py-3 rounded-lg mt-3 hover:bg-blue-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed"
         >
           {{ loading ? 'Processing...' : 'Complete Sale' }}
         </button>
@@ -118,7 +165,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from "vue"
+import { ref, computed, onMounted } from "vue"
 import api from "@/api/axios"
 
 const search = ref("")
@@ -126,14 +173,55 @@ const products = ref([])
 const cart = ref([])
 const loading = ref(false)
 
+// New refs for metadata
+const customers = ref([])
+const warehouses = ref([])
+const selectedCustomer = ref("")
+const selectedWarehouse = ref("")
+const paymentMethod = ref("cash")
+
+// Fetch customers and warehouses on mount
+const fetchMetadata = async () => {
+  try {
+    const [custRes, wareRes] = await Promise.all([
+      api.get('/customers'),
+      api.get('/warehouses')
+    ])
+    
+    customers.value = custRes.data.data || []
+    warehouses.value = wareRes.data.data || []
+    
+    // Set defaults if available
+    if (customers.value.length) {
+      selectedCustomer.value = customers.value[0].id
+    }
+    if (warehouses.value.length) {
+      selectedWarehouse.value = warehouses.value[0].id
+    }
+  } catch (error) {
+    console.error('Error fetching metadata:', error)
+    alert('Failed to load customers and warehouses')
+  }
+}
+
 const searchProducts = async () => {
-  if (!search.value) return
+  if (!search.value) {
+    products.value = []
+    return
+  }
 
-  const response = await api.get("/products", {
-    params: { search: search.value }
-  })
+  try {
+    const response = await api.get("/products", {
+      params: { 
+        search: search.value,
+        warehouse_id: selectedWarehouse.value || undefined 
+      }
+    })
 
-  products.value = response.data.data
+    products.value = response.data.data || []
+  } catch (error) {
+    console.error('Error searching products:', error)
+  }
 }
 
 const addToCart = (product) => {
@@ -142,6 +230,8 @@ const addToCart = (product) => {
   if (existing) {
     if (existing.quantity < product.stock) {
       existing.quantity++
+    } else {
+      alert(`Only ${product.stock} items available in stock`)
     }
   } else {
     cart.value.push({
@@ -157,6 +247,8 @@ const addToCart = (product) => {
 const increaseQty = (item) => {
   if (item.quantity < item.stock) {
     item.quantity++
+  } else {
+    alert(`Only ${item.stock} items available in stock`)
   }
 }
 
@@ -180,30 +272,84 @@ const tax = computed(() => subtotal.value * 0.05)
 const total = computed(() => subtotal.value + tax.value)
 
 const checkout = async () => {
+  // Validate selections
+  if (!selectedCustomer.value) {
+    alert('Please select a customer')
+    return
+  }
+  
+  if (!selectedWarehouse.value) {
+    alert('Please select a warehouse')
+    return
+  }
+
   try {
     loading.value = true
 
     const response = await api.post("/sales", {
-      items: cart.value,
-      subtotal: subtotal.value,
+      customer_id: selectedCustomer.value,
+      warehouse_id: selectedWarehouse.value,
+      sale_date: new Date().toISOString().split('T')[0],
+      payment_method: paymentMethod.value,
+      payment_status: 'paid',
+      discount: 0,
       tax: tax.value,
-      total: total.value
+      // Map items to match backend structure
+      items: cart.value.map(item => ({
+        product_id: item.id,
+        quantity: item.quantity,
+        selling_price: item.selling_price
+      }))
     })
 
-    // Download receipt
-    window.open(
-      `http://localhost:8000/api/sales/${response.data.id}/receipt`,
-      "_blank"
-    )
+    // Open receipt in a new tab using the ID from JSON response
+    if (response.data.id) {
+      window.open(`/api/sales/${response.data.id}/receipt`, "_blank")
+    }
 
+    // Reset state
     cart.value = []
     search.value = ""
     products.value = []
+    
+    alert("Sale completed successfully!")
 
   } catch (error) {
+    console.error('Checkout error:', error)
     alert(error.response?.data?.message || "Sale failed")
   } finally {
     loading.value = false
   }
 }
+
+// Watch for warehouse change to refresh product search
+const refreshProducts = () => {
+  if (search.value) {
+    searchProducts()
+  }
+}
+
+// Load metadata on component mount
+onMounted(fetchMetadata)
 </script>
+
+<style scoped>
+/* Optional: Add smooth scrolling for cart */
+.overflow-y-auto {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e0 #f7fafc;
+}
+
+.overflow-y-auto::-webkit-scrollbar {
+  width: 6px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: #f7fafc;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background-color: #cbd5e0;
+  border-radius: 3px;
+}
+</style>

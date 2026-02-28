@@ -81,6 +81,11 @@ use App\Http\Controllers\API\FinancialReportController;
 
     Route::post('/returns/{return}/approve', [SaleController::class, 'approve']);
 
+    Route::middleware(['auth:sanctum'])->group(function () {
+        // ... other routes ...
+        Route::post('/returns/{return}/approve', [SaleController::class, 'approve']);
+    });
+
 
 
 

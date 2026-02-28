@@ -127,22 +127,16 @@ class SaleController extends Controller
                 'gross_profit' => $totalGrossProfit,
             ]);
 
-            // 6️⃣ Load relationships for receipt
+            // 6️⃣ Load relationships for response
             $sale->load(['customer', 'items.product', 'user', 'warehouse']);
 
-            // 7️⃣ Generate Receipt PDF
-            $pdf = Pdf::loadView('receipts.sale', [
-                'sale' => $sale,
-                'company' => [
-                    'name'    => config('app.name'),
-                    'address' => config('app.address', 'Your Company Address'),
-                    'phone'   => config('app.phone', 'Your Phone'),
-                    'email'   => config('app.email', 'your@email.com'),
-                    'tax_id'  => config('app.tax_id', 'Your Tax ID'),
-                ]
-            ]);
+            // 7️⃣ Return JSON response instead of downloading PDF directly
+            return response()->json([
+                'message' => 'Sale completed successfully',
+                'id' => $sale->id,
+                'sale' => new SaleResource($sale)
+            ], 201);
 
-            return $pdf->download("receipt_{$sale->id}.pdf");
         });
 
     } catch (\Exception $e) {
