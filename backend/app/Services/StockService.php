@@ -9,21 +9,15 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use App\Models\Sale;
 use App\Models\SaleReturn;
-Stock
+use App\Models\Product;
+
 
 class StockService
 {
     /**
      * Increase stock for a product in a specific warehouse
      */
-    public function increaseStock(
-        int $productId,
-        int $warehouseId,
-        float $quantity,
-        float $unitCost,
-        string $referenceType,
-        int $referenceId,
-        ?int $userId = null
+    public function increaseStock(int $productId,int $warehouseId,float $quantity,float $unitCost,string $referenceType,int $referenceId,?int $userId = null
     ): void {
         DB::transaction(function () use (
             $productId,
@@ -132,15 +126,7 @@ class StockService
     /**
      * Transfer stock between warehouses
      */
-    public function transferStock(
-        int $productId,
-        int $fromWarehouseId,
-        int $toWarehouseId,
-        float $quantity,
-        float $unitCost,
-        string $referenceType,
-        int $referenceId,
-        ?int $userId = null
+    public function transferStock(int $productId,int $fromWarehouseId,int $toWarehouseId,float $quantity,float $unitCost,string $referenceType,int $referenceId,?int $userId = null
     ): void {
         DB::transaction(function () use (
             $productId,

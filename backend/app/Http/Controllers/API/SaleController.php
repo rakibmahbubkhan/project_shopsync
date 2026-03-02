@@ -48,104 +48,104 @@ class SaleController extends Controller
      */
     
     public function store(StoreSaleRequest $request)
-{
-    try {
-        return DB::transaction(function () use ($request) {
+    {
+        try {
+            return DB::transaction(function () use ($request) {
 
-            $subtotalTotal = 0;
-            $totalCogs = 0;
-            $totalGrossProfit = 0;
+                $subtotalTotal = 0;
+                $totalCogs = 0;
+                $totalGrossProfit = 0;
 
-            // 1️⃣ Create Sale Header
-            $sale = Sale::create([
-                'customer_id'    => $request->customer_id,
-                'warehouse_id'   => $request->warehouse_id,
-                'created_by'     => Auth::id(),
-                'sale_date'      => $request->sale_date,
-                'payment_method' => $request->payment_method,
-                'payment_status' => $request->payment_status,
-                'discount'       => $request->discount ?? 0,
-                'tax'            => $request->tax ?? 0,
-                'total_amount'   => 0,
-                'total_cogs'     => 0,
-                'gross_profit'   => 0,
-            ]);
-
-            // 2️⃣ Process Each Item
-            foreach ($request->items as $item) {
-
-                // Get average cost (COGS base)
-                $costPrice = $this->stockService->getAverageCost(
-                    $item['product_id'],
-                    $sale->warehouse_id
-                );
-
-                // Calculations
-                $quantity = $item['quantity'];
-                $sellingPrice = $item['selling_price'];
-
-                $subtotal = $quantity * $sellingPrice;
-                $cogs = $quantity * $costPrice;
-                $grossProfit = $subtotal - $cogs;
-
-                $subtotalTotal += $subtotal;
-                $totalCogs += $cogs;
-                $totalGrossProfit += $grossProfit;
-
-                // Create Sale Item
-                SaleItem::create([
-                    'sale_id'       => $sale->id,
-                    'product_id'    => $item['product_id'],
-                    'quantity'      => $quantity,
-                    'selling_price' => $sellingPrice,
-                    'cost_price'    => $costPrice,
-                    'subtotal'      => $subtotal,
-                    'gross_profit'  => $grossProfit,
+                // 1️⃣ Create Sale Header
+                $sale = Sale::create([
+                    'customer_id'    => $request->customer_id,
+                    'warehouse_id'   => $request->warehouse_id,
+                    'created_by'     => Auth::id(),
+                    'sale_date'      => $request->sale_date,
+                    'payment_method' => $request->payment_method,
+                    'payment_status' => $request->payment_status,
+                    'discount'       => $request->discount ?? 0,
+                    'tax'            => $request->tax ?? 0,
+                    'total_amount'   => 0,
+                    'total_cogs'     => 0,
+                    'gross_profit'   => 0,
                 ]);
 
-                // 3️⃣ Decrease Stock (Correct Parameter Order)
-                $this->stockService->decreaseStock(
-                    $item['product_id'],
-                    $sale->warehouse_id,
-                    $quantity,
-                    $costPrice,
-                    'sale',
-                    $sale->id,
-                    Auth::id()
-                );
-            }
+                // 2️⃣ Process Each Item
+                foreach ($request->items as $item) {
 
-            // 4️⃣ Calculate Final Total
-            $finalTotal = $subtotalTotal
-                - ($request->discount ?? 0)
-                + ($request->tax ?? 0);
+                    // Get average cost (COGS base)
+                    $costPrice = $this->stockService->getAverageCost(
+                        $item['product_id'],
+                        $sale->warehouse_id
+                    );
 
-            // 5️⃣ Update Sale Header with Financial Data
-            $sale->update([
-                'total_amount' => $finalTotal,
-                'total_cogs'   => $totalCogs,
-                'gross_profit' => $totalGrossProfit,
-            ]);
+                    // Calculations
+                    $quantity = $item['quantity'];
+                    $sellingPrice = $item['selling_price'];
 
-            // 6️⃣ Load relationships for response
-            $sale->load(['customer', 'items.product', 'user', 'warehouse']);
+                    $subtotal = $quantity * $sellingPrice;
+                    $cogs = $quantity * $costPrice;
+                    $grossProfit = $subtotal - $cogs;
 
-            // 7️⃣ Return JSON response instead of downloading PDF directly
+                    $subtotalTotal += $subtotal;
+                    $totalCogs += $cogs;
+                    $totalGrossProfit += $grossProfit;
+
+                    // Create Sale Item
+                    SaleItem::create([
+                        'sale_id'       => $sale->id,
+                        'product_id'    => $item['product_id'],
+                        'quantity'      => $quantity,
+                        'selling_price' => $sellingPrice,
+                        'cost_price'    => $costPrice,
+                        'subtotal'      => $subtotal,
+                        'gross_profit'  => $grossProfit,
+                    ]);
+
+                    // 3️⃣ Decrease Stock (Correct Parameter Order)
+                    $this->stockService->decreaseStock(
+                        $item['product_id'],
+                        $sale->warehouse_id,
+                        $quantity,
+                        $costPrice,
+                        'sale',
+                        $sale->id,
+                        Auth::id()
+                    );
+                }
+
+                // 4️⃣ Calculate Final Total
+                $finalTotal = $subtotalTotal
+                    - ($request->discount ?? 0)
+                    + ($request->tax ?? 0);
+
+                // 5️⃣ Update Sale Header with Financial Data
+                $sale->update([
+                    'total_amount' => $finalTotal,
+                    'total_cogs'   => $totalCogs,
+                    'gross_profit' => $totalGrossProfit,
+                ]);
+
+                // 6️⃣ Load relationships for the response
+                $sale->load(['customer', 'items.product', 'user', 'warehouse']);
+
+                // 7️⃣ Return JSON instead of a direct PDF download
+                return response()->json([
+                    'message' => 'Sale created successfully',
+                    'id'      => $sale->id,
+                    'sale'    => new SaleResource($sale)
+                ], 201);
+
+            });
+
+        } catch (\Exception $e) {
+
             return response()->json([
-                'message' => 'Sale completed successfully',
-                'id' => $sale->id,
-                'sale' => new SaleResource($sale)
-            ], 201);
-
-        });
-
-    } catch (\Exception $e) {
-
-        return response()->json([
-            'message' => 'Failed to create sale: ' . $e->getMessage()
-        ], 500);
+                'message' => 'Failed to create sale: ' . $e->getMessage()
+            ], 500);
+        }
     }
-}
     /**
      * Display the specified sale.
      */

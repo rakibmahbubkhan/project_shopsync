@@ -44,42 +44,27 @@
         Cart
       </h2>
 
-      <!-- Customer, Warehouse, Payment Selection -->
-      <div class="mb-4 space-y-3">
+      <!-- Customer, Warehouse, Payment Selection (Added above Cart Items) -->
+      <div class="mb-4 space-y-3 bg-gray-50 p-3 rounded-lg border">
         <div>
-          <label class="text-xs font-semibold text-gray-500 uppercase block mb-1">Customer</label>
-          <select 
-            v-model="selectedCustomer" 
-            class="w-full border rounded p-2 text-sm bg-white"
-            required
-          >
+          <label class="text-xs font-bold text-gray-500 uppercase">Customer</label>
+          <select v-model="selectedCustomer" class="w-full border rounded p-1 text-sm bg-white">
             <option value="" disabled>Select customer</option>
-            <option v-for="c in customers" :key="c.id" :value="c.id">
-              {{ c.name }}
-            </option>
+            <option v-for="c in customers" :key="c.id" :value="c.id">{{ c.name }}</option>
           </select>
         </div>
         
         <div>
-          <label class="text-xs font-semibold text-gray-500 uppercase block mb-1">Warehouse</label>
-          <select 
-            v-model="selectedWarehouse" 
-            class="w-full border rounded p-2 text-sm bg-white"
-            required
-          >
+          <label class="text-xs font-bold text-gray-500 uppercase">Warehouse</label>
+          <select v-model="selectedWarehouse" class="w-full border rounded p-1 text-sm bg-white">
             <option value="" disabled>Select warehouse</option>
-            <option v-for="w in warehouses" :key="w.id" :value="w.id">
-              {{ w.name }}
-            </option>
+            <option v-for="w in warehouses" :key="w.id" :value="w.id">{{ w.name }}</option>
           </select>
         </div>
 
         <div>
-          <label class="text-xs font-semibold text-gray-500 uppercase block mb-1">Payment Method</label>
-          <select 
-            v-model="paymentMethod" 
-            class="w-full border rounded p-2 text-sm bg-white"
-          >
+          <label class="text-xs font-bold text-gray-500 uppercase">Payment Method</label>
+          <select v-model="paymentMethod" class="w-full border rounded p-1 text-sm bg-white">
             <option value="cash">Cash</option>
             <option value="card">Card</option>
             <option value="wallet">Mobile Wallet</option>
@@ -165,22 +150,23 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue"
+import { ref, computed, onMounted, watch } from "vue"
 import api from "@/api/axios"
 
+// Core refs
 const search = ref("")
 const products = ref([])
 const cart = ref([])
 const loading = ref(false)
 
-// New refs for metadata
+// Metadata refs
 const customers = ref([])
 const warehouses = ref([])
 const selectedCustomer = ref("")
 const selectedWarehouse = ref("")
 const paymentMethod = ref("cash")
 
-// Fetch customers and warehouses on mount
+// Fetch initialization data
 const fetchMetadata = async () => {
   try {
     const [custRes, wareRes] = await Promise.all([
@@ -191,7 +177,7 @@ const fetchMetadata = async () => {
     customers.value = custRes.data.data || []
     warehouses.value = wareRes.data.data || []
     
-    // Set defaults if available
+    // Set defaults
     if (customers.value.length) {
       selectedCustomer.value = customers.value[0].id
     }
@@ -204,6 +190,7 @@ const fetchMetadata = async () => {
   }
 }
 
+// Search products
 const searchProducts = async () => {
   if (!search.value) {
     products.value = []
@@ -224,6 +211,7 @@ const searchProducts = async () => {
   }
 }
 
+// Add to cart
 const addToCart = (product) => {
   const existing = cart.value.find(i => i.id === product.id)
 
@@ -244,6 +232,7 @@ const addToCart = (product) => {
   }
 }
 
+// Cart item controls
 const increaseQty = (item) => {
   if (item.quantity < item.stock) {
     item.quantity++
@@ -262,6 +251,7 @@ const removeFromCart = (id) => {
   cart.value = cart.value.filter(i => i.id !== id)
 }
 
+// Computed totals
 const subtotal = computed(() =>
   cart.value.reduce((sum, item) =>
     sum + item.quantity * item.selling_price, 0)
@@ -271,15 +261,10 @@ const tax = computed(() => subtotal.value * 0.05)
 
 const total = computed(() => subtotal.value + tax.value)
 
+// Checkout
 const checkout = async () => {
-  // Validate selections
-  if (!selectedCustomer.value) {
-    alert('Please select a customer')
-    return
-  }
-  
-  if (!selectedWarehouse.value) {
-    alert('Please select a warehouse')
+  if (!selectedCustomer.value || !selectedWarehouse.value) {
+    alert("Please select a customer and warehouse")
     return
   }
 
@@ -289,12 +274,12 @@ const checkout = async () => {
     const response = await api.post("/sales", {
       customer_id: selectedCustomer.value,
       warehouse_id: selectedWarehouse.value,
-      sale_date: new Date().toISOString().split('T')[0],
       payment_method: paymentMethod.value,
       payment_status: 'paid',
-      discount: 0,
+      sale_date: new Date().toISOString().split('T')[0],
       tax: tax.value,
-      // Map items to match backend structure
+      discount: 0,
+      // Map cart items to the keys the backend expects
       items: cart.value.map(item => ({
         product_id: item.id,
         quantity: item.quantity,
@@ -302,17 +287,16 @@ const checkout = async () => {
       }))
     })
 
-    // Open receipt in a new tab using the ID from JSON response
+    // Open receipt in new tab using the ID from JSON response
     if (response.data.id) {
       window.open(`/api/sales/${response.data.id}/receipt`, "_blank")
     }
 
-    // Reset state
+    // Reset POS
     cart.value = []
     search.value = ""
     products.value = []
-    
-    alert("Sale completed successfully!")
+    alert("Transaction Complete")
 
   } catch (error) {
     console.error('Checkout error:', error)
@@ -323,13 +307,13 @@ const checkout = async () => {
 }
 
 // Watch for warehouse change to refresh product search
-const refreshProducts = () => {
+watch(selectedWarehouse, () => {
   if (search.value) {
     searchProducts()
   }
-}
+})
 
-// Load metadata on component mount
+// Load metadata on mount
 onMounted(fetchMetadata)
 </script>
 
