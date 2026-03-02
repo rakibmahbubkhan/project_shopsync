@@ -63,7 +63,7 @@
         </div>
 
         <div>
-          <label class="text-xs font-bold text-gray-500 uppercase">Payment Method</label>
+          <label class="text-xs font-bold text-gray-500 uppercase">Payment</label>
           <select v-model="paymentMethod" class="w-full border rounded p-1 text-sm bg-white">
             <option value="cash">Cash</option>
             <option value="card">Card</option>
@@ -153,18 +153,17 @@
 import { ref, computed, onMounted, watch } from "vue"
 import api from "@/api/axios"
 
-// Core refs
+// State for metadata
+const customers = ref([])
+const warehouses = ref([])
+const selectedCustomer = ref(null)
+const selectedWarehouse = ref(null)
+const paymentMethod = ref('cash')
+
 const search = ref("")
 const products = ref([])
 const cart = ref([])
 const loading = ref(false)
-
-// Metadata refs
-const customers = ref([])
-const warehouses = ref([])
-const selectedCustomer = ref("")
-const selectedWarehouse = ref("")
-const paymentMethod = ref("cash")
 
 // Fetch initialization data
 const fetchMetadata = async () => {
@@ -263,15 +262,23 @@ const total = computed(() => subtotal.value + tax.value)
 
 // Checkout
 const checkout = async () => {
+  // Validate selections first
   if (!selectedCustomer.value || !selectedWarehouse.value) {
     alert("Please select a customer and warehouse")
+    return
+  }
+
+  // Validate cart has items
+  if (cart.value.length === 0) {
+    alert("Cart is empty. Please add items to continue.")
     return
   }
 
   try {
     loading.value = true
 
-    const response = await api.post("/sales", {
+    // Prepare payload
+    const payload = {
       customer_id: selectedCustomer.value,
       warehouse_id: selectedWarehouse.value,
       payment_method: paymentMethod.value,
@@ -279,28 +286,41 @@ const checkout = async () => {
       sale_date: new Date().toISOString().split('T')[0],
       tax: tax.value,
       discount: 0,
-      // Map cart items to the keys the backend expects
+      // Map cart items to backend structure
       items: cart.value.map(item => ({
         product_id: item.id,
         quantity: item.quantity,
         selling_price: item.selling_price
       }))
-    })
-
-    // Open receipt in new tab using the ID from JSON response
-    if (response.data.id) {
-      window.open(`/api/sales/${response.data.id}/receipt`, "_blank")
     }
 
-    // Reset POS
+    const response = await api.post("/sales", payload)
+
+    // Use the ID from the JSON response to open the receipt API
+    if (response.data?.id) {
+      const receiptUrl = `${import.meta.env.VITE_API_URL}/sales/${response.data.id}/receipt`
+      window.open(receiptUrl, "_blank")
+    }
+
+    // Success State - Reset POS
     cart.value = []
     search.value = ""
     products.value = []
-    alert("Transaction Complete")
+    
+    // Show success message with sale ID
+    alert(`Sale #${response.data.id} completed successfully.`)
 
   } catch (error) {
     console.error('Checkout error:', error)
-    alert(error.response?.data?.message || "Sale failed")
+    
+    // Enhanced error handling
+    const errorMessage = error.response?.data?.message 
+      || error.response?.data?.errors 
+      || error.message 
+      || "Unknown Error"
+    
+    alert(`Transaction Failed: ${errorMessage}`)
+    
   } finally {
     loading.value = false
   }

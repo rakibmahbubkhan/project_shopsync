@@ -10,14 +10,21 @@ use Illuminate\Validation\ValidationException;
 use App\Models\Sale;
 use App\Models\SaleReturn;
 use App\Models\Product;
-
+use App\Models\Warehouse;
 
 class StockService
 {
     /**
      * Increase stock for a product in a specific warehouse
      */
-    public function increaseStock(int $productId,int $warehouseId,float $quantity,float $unitCost,string $referenceType,int $referenceId,?int $userId = null
+    public function increaseStock(
+        int $productId,
+        int $warehouseId,
+        float $quantity,
+        float $unitCost,
+        string $referenceType,
+        int $referenceId,
+        ?int $userId = null
     ): void {
         DB::transaction(function () use (
             $productId,
@@ -37,6 +44,9 @@ class StockService
                 ['quantity' => 0]
             );
 
+            // Store balance before for ledger
+            $balanceBefore = $stock->quantity;
+
             // Increase quantity
             $stock->increment('quantity', $quantity);
 
@@ -48,11 +58,12 @@ class StockService
                 'reference_id'   => $referenceId,
                 'movement_type'  => 'in',
                 'quantity'       => $quantity,
-                'balance_before' => $stock->quantity - $quantity,
+                'balance_before' => $balanceBefore,
                 'balance_after'  => $stock->quantity,
                 'unit_cost'      => $unitCost,
                 'total_cost'     => $quantity * $unitCost,
                 'user_id'        => $userId ?? Auth::id(),
+                'created_at'     => now()
             ]);
         });
     }
@@ -119,6 +130,7 @@ class StockService
                 'unit_cost'      => $unitCost,
                 'total_cost'     => $quantity * $unitCost,
                 'user_id'        => $userId ?? Auth::id(),
+                'created_at'     => now()
             ]);
         });
     }
@@ -126,7 +138,15 @@ class StockService
     /**
      * Transfer stock between warehouses
      */
-    public function transferStock(int $productId,int $fromWarehouseId,int $toWarehouseId,float $quantity,float $unitCost,string $referenceType,int $referenceId,?int $userId = null
+    public function transferStock(
+        int $productId,
+        int $fromWarehouseId,
+        int $toWarehouseId,
+        float $quantity,
+        float $unitCost,
+        string $referenceType,
+        int $referenceId,
+        ?int $userId = null
     ): void {
         DB::transaction(function () use (
             $productId,
@@ -169,7 +189,6 @@ class StockService
     {
         $stock = StockLog::where('product_id', $productId)
             ->where('warehouse_id', $warehouseId)
-            ->lockForUpdate()
             ->first();
 
         return $stock ? $stock->quantity : 0;
@@ -212,20 +231,32 @@ class StockService
         return $query->paginate(15);
     }
 
+    /**
+     * Get the average cost of a product at a specific warehouse.
+     */
     public function getAverageCost(int $productId, int $warehouseId): float
     {
+        // Get the latest purchase or receiving cost
         $latestIn = InventoryLedger::where('product_id', $productId)
             ->where('warehouse_id', $warehouseId)
             ->where('movement_type', 'in')
             ->latest()
             ->first();
 
-        return $latestIn ? $latestIn->unit_cost : 0;
+        // Fallback to product's cost price if no ledger entries
+        if (!$latestIn) {
+            $product = Product::find($productId);
+            return $product ? $product->cost_price : 0;
+        }
+
+        return $latestIn->unit_cost;
     }
 
+    /**
+     * Process a sale return (full workflow)
+     */
     public function processSaleReturn(Sale $sale, int $productId, int $quantity, int $userId): void 
     {
-
         $item = $sale->items()
             ->where('product_id', $productId)
             ->firstOrFail();
@@ -237,7 +268,6 @@ class StockService
         }
 
         DB::transaction(function () use ($sale, $item, $quantity, $userId) {
-
             $refundAmount = $quantity * $item->selling_price;
             $cogsReversal = $quantity * $item->cost_price;
             $profitReversal = $refundAmount - $cogsReversal;
@@ -260,8 +290,9 @@ class StockService
                 'quantity'       => $quantity,
                 'refund_amount'  => $refundAmount,
                 'cost_price'     => $item->cost_price,
-                'profit_reversed'=> $profitReversal,
+                'profit_reversed' => $profitReversal,
                 'processed_by'   => $userId,
+                'status'         => 'approved'
             ]);
 
             // 3️⃣ Update Sale Totals
@@ -271,62 +302,92 @@ class StockService
         });
     }
 
-    public function prepareSaleReturn(Sale $sale,int $productId,int $quantity,int $userId,string $reason): SaleReturn 
+    /**
+     * Prepare a return record (pending approval if threshold exceeded).
+     */
+    public function prepareSaleReturn(Sale $sale, int $productId, int $quantity, int $userId, string $reason): SaleReturn
     {
-        $saleItem = $sale->items()
+        $item = $sale->items()
             ->where('product_id', $productId)
             ->firstOrFail();
-
-        // Calculate already returned qty
-        $alreadyReturned = $sale->returns()
+        
+        // Calculate already returned quantity
+        $alreadyReturned = SaleReturn::where('sale_id', $sale->id)
             ->where('product_id', $productId)
             ->sum('quantity');
 
-        $remainingQty = $saleItem->quantity - $alreadyReturned;
+        $remainingQty = $item->quantity - $alreadyReturned;
 
         if ($quantity > $remainingQty) {
-            throw new \Exception('Return quantity exceeds remaining quantity.');
+            throw new \Exception("Return quantity exceeds remaining quantity. Available: {$remainingQty}");
         }
 
-        $refundAmount = $quantity * $saleItem->unit_price;
+        $refundAmount = $quantity * $item->selling_price;
 
         return SaleReturn::create([
-            'sale_id'       => $sale->id,
-            'product_id'    => $productId,
-            'quantity'      => $quantity,
-            'reason'        => $reason,
-            'refund_amount' => $refundAmount,
-            'processed_by'  => $userId,
-            'status'        => 'pending'
+            'sale_id'        => $sale->id,
+            'product_id'     => $productId,
+            'quantity'       => $quantity,
+            'refund_amount'  => $refundAmount,
+            'reason'         => $reason,
+            'status'         => 'pending',
+            'created_by'     => $userId,
         ]);
     }
 
+    /**
+     * Finalize stock return (increments stock back).
+     */
     public function finalizeSaleReturn(SaleReturn $return): void
     {
-        $sale = $return->sale;
-        $productId = $return->product_id;
-        $quantity = $return->quantity;
+        DB::transaction(function () use ($return) {
+            $sale = $return->sale;
+            $productId = $return->product_id;
+            $quantity = $return->quantity;
 
-        $saleItem = $sale->items()
-            ->where('product_id', $productId)
-            ->firstOrFail();
+            $saleItem = $sale->items()
+                ->where('product_id', $productId)
+                ->firstOrFail();
 
-        // 1️⃣ Restore stock
+            // 1️⃣ Log to Inventory Ledger
+            InventoryLedger::create([
+                'product_id'     => $productId,
+                'warehouse_id'   => $sale->warehouse_id,
+                'reference_type' => 'sale_return',
+                'reference_id'   => $return->id,
+                'movement_type'  => 'in',
+                'quantity'       => $quantity,
+                'balance_before' => $this->getStockBalance($productId, $sale->warehouse_id),
+                'balance_after'  => $this->getStockBalance($productId, $sale->warehouse_id) + $quantity,
+                'unit_cost'      => $saleItem->cost_price,
+                'total_cost'     => $quantity * $saleItem->cost_price,
+                'user_id'        => $return->created_by,
+                'created_at'     => now()
+            ]);
 
-        Product::where('id', $productId)->increment('quantity', $quantity);
+            // 2️⃣ Restore stock
+            $stock = StockLog::firstOrCreate(
+                [
+                    'product_id' => $productId,
+                    'warehouse_id' => $sale->warehouse_id
+                ],
+                ['quantity' => 0]
+            );
+            $stock->increment('quantity', $quantity);
 
+            // 3️⃣ Adjust sale totals
+            $cogsReduction = $quantity * $saleItem->cost_price;
+            $profitReduction = $return->refund_amount - $cogsReduction;
 
-        // 2️⃣ Adjust sale totals
-        $sale->decrement('total_amount', $return->refund_amount);
+            $sale->decrement('total_amount', $return->refund_amount);
+            $sale->decrement('total_cogs', $cogsReduction);
+            $sale->decrement('gross_profit', $profitReduction);
 
-        $cogsReduction = $quantity * $saleItem->cost_price;
-        $sale->decrement('total_cogs', $cogsReduction);
-        $sale->decrement('gross_profit', $return->refund_amount - $cogsReduction);
-
-        // 3️⃣ Mark return approved
-        $return->update([
-            'status' => 'approved',
-            'approved_at' => now(),
-        ]);
+            // 4️⃣ Mark return approved
+            $return->update([
+                'status' => 'approved',
+                'approved_at' => now(),
+            ]);
+        });
     }
 }
