@@ -45,4 +45,22 @@ class AccountingService
             return $entry;
         });
     }
+
+    public function deleteEntry(string $referenceType, int $referenceId): bool
+    {
+        return DB::transaction(function () use ($referenceType, $referenceId) {
+            // Find the entry by its reference (e.g., 'sale', 10)
+            $entry = JournalEntry::where('reference_type', $referenceType)
+                ->where('reference_id', $referenceId)
+                ->first();
+
+            if ($entry) {
+                // Deleting the entry will cascade delete lines in the database
+                return $entry->delete();
+            }
+
+            return false;
+        });
+    }
+    
 }

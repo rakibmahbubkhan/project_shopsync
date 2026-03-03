@@ -338,6 +338,9 @@ class StockService
     /**
      * Finalize stock return (increments stock back).
      */
+    /**
+ * Finalize stock return (increments stock back).
+ */
     public function finalizeSaleReturn(SaleReturn $return): void
     {
         DB::transaction(function () use ($return) {
@@ -349,33 +352,18 @@ class StockService
                 ->where('product_id', $productId)
                 ->firstOrFail();
 
-            // 1️⃣ Log to Inventory Ledger
-            InventoryLedger::create([
-                'product_id'     => $productId,
-                'warehouse_id'   => $sale->warehouse_id,
-                'reference_type' => 'sale_return',
-                'reference_id'   => $return->id,
-                'movement_type'  => 'in',
-                'quantity'       => $quantity,
-                'balance_before' => $this->getStockBalance($productId, $sale->warehouse_id),
-                'balance_after'  => $this->getStockBalance($productId, $sale->warehouse_id) + $quantity,
-                'unit_cost'      => $saleItem->cost_price,
-                'total_cost'     => $quantity * $saleItem->cost_price,
-                'user_id'        => $return->created_by,
-                'created_at'     => now()
-            ]);
-
-            // 2️⃣ Restore stock
-            $stock = StockLog::firstOrCreate(
-                [
-                    'product_id' => $productId,
-                    'warehouse_id' => $sale->warehouse_id
-                ],
-                ['quantity' => 0]
+            // 1️⃣ Restore Stock in the specific warehouse using increaseStock method
+            $this->increaseStock(
+                $productId,
+                $sale->warehouse_id,
+                $quantity,
+                $saleItem->cost_price, // Use cost_price from sale item
+                'sale_return',
+                $return->id,
+                $return->created_by
             );
-            $stock->increment('quantity', $quantity);
 
-            // 3️⃣ Adjust sale totals
+            // 2️⃣ Adjust sale totals
             $cogsReduction = $quantity * $saleItem->cost_price;
             $profitReduction = $return->refund_amount - $cogsReduction;
 
@@ -383,7 +371,7 @@ class StockService
             $sale->decrement('total_cogs', $cogsReduction);
             $sale->decrement('gross_profit', $profitReduction);
 
-            // 4️⃣ Mark return approved
+            // 3️⃣ Mark return approved
             $return->update([
                 'status' => 'approved',
                 'approved_at' => now(),

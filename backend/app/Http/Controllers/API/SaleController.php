@@ -12,12 +12,13 @@ use App\Models\SaleItem;
 use App\Models\Refund;
 use App\Models\SaleReturn;
 use App\Services\StockService;
+use App\Services\AccountingService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Support\Facades\Request;
+use Illuminate\Http\Request;
 
 
 class SaleController extends Controller
@@ -25,10 +26,12 @@ class SaleController extends Controller
     use AuthorizesRequests;
 
     protected StockService $stockService;
+    protected AccountingService $accountingService;
 
-    public function __construct(StockService $stockService)
+    public function __construct(StockService $stockService, AccountingService $accountingService)
     {
         $this->stockService = $stockService;
+        $this->accountingService = $accountingService;
     }
 
     /**
@@ -46,7 +49,6 @@ class SaleController extends Controller
     /**
      * Store a newly created sale.
      */
-    
     public function store(StoreSaleRequest $request)
     {
         try {
@@ -73,14 +75,11 @@ class SaleController extends Controller
 
                 // 2️⃣ Process Each Item
                 foreach ($request->items as $item) {
-
-                    // Get average cost (COGS base)
                     $costPrice = $this->stockService->getAverageCost(
                         $item['product_id'],
                         $sale->warehouse_id
                     );
 
-                    // Calculations
                     $quantity = $item['quantity'];
                     $sellingPrice = $item['selling_price'];
 
@@ -92,7 +91,6 @@ class SaleController extends Controller
                     $totalCogs += $cogs;
                     $totalGrossProfit += $grossProfit;
 
-                    // Create Sale Item
                     SaleItem::create([
                         'sale_id'       => $sale->id,
                         'product_id'    => $item['product_id'],
@@ -103,7 +101,6 @@ class SaleController extends Controller
                         'gross_profit'  => $grossProfit,
                     ]);
 
-                    // 3️⃣ Decrease Stock (Correct Parameter Order)
                     $this->stockService->decreaseStock(
                         $item['product_id'],
                         $sale->warehouse_id,
@@ -115,22 +112,54 @@ class SaleController extends Controller
                     );
                 }
 
-                // 4️⃣ Calculate Final Total
+                // 3️⃣ Calculate Final Total
                 $finalTotal = $subtotalTotal
                     - ($request->discount ?? 0)
                     + ($request->tax ?? 0);
 
-                // 5️⃣ Update Sale Header with Financial Data
+                // 4️⃣ Update Sale Header with Financial Data
                 $sale->update([
                     'total_amount' => $finalTotal,
                     'total_cogs'   => $totalCogs,
                     'gross_profit' => $totalGrossProfit,
                 ]);
 
+                // 5️⃣ Post Financial Journal Entry
+                $lines = [
+                    // Debit: Cash or Accounts Receivable
+                    ['account_id' => $this->getPaymentAccountId($request->payment_method), 'debit' => $finalTotal, 'credit' => 0],
+                    
+                    // Credit: Sales Revenue
+                    ['account_id' => config('accounts.sales_revenue', 2), 'debit' => 0, 'credit' => $subtotalTotal],
+                    
+                    // Debit: COGS
+                    ['account_id' => config('accounts.cogs', 3), 'debit' => $totalCogs, 'credit' => 0],
+                    
+                    // Credit: Inventory Asset
+                    ['account_id' => config('accounts.inventory', 4), 'debit' => 0, 'credit' => $totalCogs],
+                ];
+
+                // Add tax line if applicable
+                if ($request->tax > 0) {
+                    $lines[] = ['account_id' => config('accounts.tax_payable', 5), 'debit' => 0, 'credit' => $request->tax];
+                }
+
+                // Add discount line if applicable
+                if ($request->discount > 0) {
+                    $lines[] = ['account_id' => config('accounts.sales_discount', 6), 'debit' => $request->discount, 'credit' => 0];
+                }
+
+                $this->accountingService->createEntry(
+                    date: $sale->sale_date,
+                    description: "Sales Invoice #{$sale->id}",
+                    lines: $lines,
+                    referenceType: 'sale',
+                    referenceId: $sale->id
+                );
+
                 // 6️⃣ Load relationships for the response
                 $sale->load(['customer', 'items.product', 'user', 'warehouse']);
 
-                // 7️⃣ Return JSON instead of a direct PDF download
                 return response()->json([
                     'message' => 'Sale created successfully',
                     'id'      => $sale->id,
@@ -140,12 +169,13 @@ class SaleController extends Controller
             });
 
         } catch (\Exception $e) {
-
+            DB::rollBack();
             return response()->json([
                 'message' => 'Failed to create sale: ' . $e->getMessage()
             ], 500);
         }
     }
+    
     /**
      * Display the specified sale.
      */
@@ -168,58 +198,78 @@ class SaleController extends Controller
     public function update(UpdateSaleRequest $request, Sale $sale): SaleResource|JsonResponse
     {
         try {
-            // Authorization is handled by UpdateSaleRequest
             $this->validateSaleModifiable($sale);
 
             return DB::transaction(function () use ($request, $sale) {
-                // 1️⃣ Restore stock from old items
+                // 1️⃣ Delete existing journal entries for this sale
+                // You'll need to implement this method in AccountingService
+                $this->accountingService->deleteEntry('sale', $sale->id);
+
+                // 2️⃣ Restore stock from old items using COST PRICE, not selling price
                 foreach ($sale->items as $oldItem) {
-                $this->stockService->increaseStock(
-                    $oldItem->product_id,
-                    $sale->warehouse_id,
-                    $oldItem->quantity,
-                    $oldItem->selling_price,
-                    'sale_update_restore',
-                    $sale->id,
-                    Auth::id()
-                );
+                    $this->stockService->increaseStock(
+                        $oldItem->product_id,
+                        $sale->warehouse_id,
+                        $oldItem->quantity,
+                        $oldItem->cost_price, // FIXED: Use cost_price instead of selling_price
+                        'sale_update_restore',
+                        $sale->id,
+                        Auth::id()
+                    );
                 }
 
-                // 2️⃣ Delete old items
+                // 3️⃣ Delete old items
                 $sale->items()->delete();
 
                 $subtotalTotal = 0;
+                $totalCogs = 0;
+                $totalGrossProfit = 0;
 
-                // 3️⃣ Insert new items & decrease stock again
+                // 4️⃣ Insert new items & decrease stock again
                 foreach ($request->items as $item) {
-                    $subtotal = $item['quantity'] * $item['selling_price'];
+                    $costPrice = $this->stockService->getAverageCost(
+                        $item['product_id'],
+                        $sale->warehouse_id
+                    );
+
+                    $quantity = $item['quantity'];
+                    $sellingPrice = $item['selling_price'];
+
+                    $subtotal = $quantity * $sellingPrice;
+                    $cogs = $quantity * $costPrice;
+                    $grossProfit = $subtotal - $cogs;
+
                     $subtotalTotal += $subtotal;
+                    $totalCogs += $cogs;
+                    $totalGrossProfit += $grossProfit;
 
                     SaleItem::create([
                         'sale_id'       => $sale->id,
                         'product_id'    => $item['product_id'],
-                        'quantity'      => $item['quantity'],
-                        'selling_price' => $item['selling_price'],
+                        'quantity'      => $quantity,
+                        'selling_price' => $sellingPrice,
+                        'cost_price'    => $costPrice,
                         'subtotal'      => $subtotal,
+                        'gross_profit'  => $grossProfit,
                     ]);
 
-                        $this->stockService->decreaseStock(
+                    $this->stockService->decreaseStock(
                         $item['product_id'],
                         $sale->warehouse_id,
-                        $item['quantity'],
-                        $item['selling_price'],
+                        $quantity,
+                        $costPrice,
                         'sale_update',
                         $sale->id,
                         Auth::id()
-                        );
+                    );
                 }
 
-                // 4️⃣ Recalculate total
+                // 5️⃣ Recalculate total
                 $finalTotal = $subtotalTotal
                     - ($request->discount ?? 0)
                     + ($request->tax ?? 0);
 
-                // 5️⃣ Update sale header
+                // 6️⃣ Update sale header
                 $sale->update([
                     'customer_id'    => $request->customer_id,
                     'sale_date'      => $request->sale_date,
@@ -228,7 +278,33 @@ class SaleController extends Controller
                     'discount'       => $request->discount ?? 0,
                     'tax'            => $request->tax ?? 0,
                     'total_amount'   => $finalTotal,
+                    'total_cogs'     => $totalCogs,
+                    'gross_profit'   => $totalGrossProfit,
                 ]);
+
+                // 7️⃣ Post new financial journal entry
+                $lines = [
+                    ['account_id' => $this->getPaymentAccountId($request->payment_method), 'debit' => $finalTotal, 'credit' => 0],
+                    ['account_id' => config('accounts.sales_revenue', 2), 'debit' => 0, 'credit' => $subtotalTotal],
+                    ['account_id' => config('accounts.cogs', 3), 'debit' => $totalCogs, 'credit' => 0],
+                    ['account_id' => config('accounts.inventory', 4), 'debit' => 0, 'credit' => $totalCogs],
+                ];
+
+                if ($request->tax > 0) {
+                    $lines[] = ['account_id' => config('accounts.tax_payable', 5), 'debit' => 0, 'credit' => $request->tax];
+                }
+
+                if ($request->discount > 0) {
+                    $lines[] = ['account_id' => config('accounts.sales_discount', 6), 'debit' => $request->discount, 'credit' => 0];
+                }
+
+                $this->accountingService->createEntry(
+                    date: $sale->sale_date,
+                    description: "Sales Invoice #{$sale->id} (Updated)",
+                    lines: $lines,
+                    referenceType: 'sale',
+                    referenceId: $sale->id
+                );
 
                 return new SaleResource(
                     $sale->load(['customer', 'items.product'])
@@ -253,20 +329,22 @@ class SaleController extends Controller
             $this->validateSaleModifiable($sale);
 
             return DB::transaction(function () use ($sale) {
-                // 1️⃣ Restore stock for all items
+                // 1️⃣ Delete journal entries
+                $this->accountingService->deleteEntry('sale', $sale->id);
+                // 2️⃣ Restore stock for all items using COST PRICE
                 foreach ($sale->items as $item) {
                     $this->stockService->increaseStock(
-                $item->product_id,
-                $sale->warehouse_id,
-                $item->quantity,
-                $item->selling_price,
-                'sale_delete_restore',
-                $sale->id,
-                Auth::id()
-                );
+                        $item->product_id,
+                        $sale->warehouse_id,
+                        $item->quantity,
+                        $item->cost_price, // FIXED: Use cost_price instead of selling_price
+                        'sale_delete_restore',
+                        $sale->id,
+                        Auth::id()
+                    );
                 }
 
-                // 2️⃣ Delete sale (cascade deletes items)
+                // 3️⃣ Delete sale (cascade deletes items)
                 $sale->delete();
 
                 return response()->json([
@@ -295,6 +373,18 @@ class SaleController extends Controller
         }
     }
 
+    /**
+     * Get the appropriate account ID based on payment method.
+     */
+    private function getPaymentAccountId(string $paymentMethod): int
+    {
+        return match($paymentMethod) {
+            'cash' => config('accounts.cash', 1),
+            'card' => config('accounts.accounts_receivable', 7),
+            'wallet' => config('accounts.wallet', 8),
+            default => config('accounts.accounts_receivable', 7),
+        };
+    }
 
     public function receipt(Sale $sale)
     {
@@ -317,7 +407,6 @@ class SaleController extends Controller
         ]);
 
         DB::transaction(function () use ($request, $sale) {
-
             $return = $this->stockService->prepareSaleReturn(
                 $sale,
                 $request->product_id,
@@ -328,19 +417,16 @@ class SaleController extends Controller
 
             $refundAmount = $return->refund_amount;
 
-            if ($refundAmount > config('pos.return_approval_threshold')) {
-
+            if ($refundAmount > config('pos.return_approval_threshold', 100)) {
                 $return->update([
                     'status' => 'pending'
                 ]);
-
             } else {
-
                 $this->approveReturn($return, Auth::id());
             }
         });
 
-        $sale->load(['returns.product','returns.refund']);
+        $sale->load(['returns.product', 'returns.refund']);
 
         return response()->json([
             'message' => 'Return submitted',
@@ -373,21 +459,58 @@ class SaleController extends Controller
 
     public function approveReturn(SaleReturn $return, $managerId)
     {
-        $return->update([
-            'status' => 'approved',
-            'approved_by' => $managerId,
-            'approved_at' => now()
-        ]);
+        DB::transaction(function () use ($return, $managerId) {
+            // Update return status
+            $return->update([
+                'status' => 'approved',
+                'approved_by' => $managerId,
+                'approved_at' => now()
+            ]);
 
-        // Now finalize stock + ledger
-        $this->stockService->finalizeSaleReturn($return);
+            // Finalize stock (this already handles inventory ledger)
+            $this->stockService->finalizeSaleReturn($return);
 
-        Refund::create([
-            'sale_return_id' => $return->id,
-            'payment_method' => $return->payment_method,
-            'amount'         => $return->refund_amount,
-            'processed_by'   => $managerId,
-        ]);
+            // Create refund record
+            Refund::create([
+                'sale_return_id' => $return->id,
+                'payment_method' => $return->payment_method,
+                'amount'         => $return->refund_amount,
+                'processed_by'   => $managerId,
+            ]);
+
+            // Create accounting entry for the refund
+            $cogsAmount = $this->calculateReturnCogs($return);
+            
+            $lines = [
+                // Debit: Sales Returns/Allowances
+                ['account_id' => config('accounts.sales_returns', 9), 'debit' => $return->refund_amount, 'credit' => 0],
+                // Credit: Cash/Accounts Receivable
+                ['account_id' => $this->getPaymentAccountId($return->payment_method), 'debit' => 0, 'credit' => $return->refund_amount],
+            ];
+
+            // Add inventory/COGS reversal if there's a cost
+            if ($cogsAmount > 0) {
+                $lines[] = ['account_id' => config('accounts.inventory', 4), 'debit' => $cogsAmount, 'credit' => 0];
+                $lines[] = ['account_id' => config('accounts.cogs', 3), 'debit' => 0, 'credit' => $cogsAmount];
+            }
+
+            $this->accountingService->createEntry(
+                date: now(),
+                description: "Sales Return for Invoice #{$return->sale_id} - Product #{$return->product_id}",
+                lines: $lines,
+                referenceType: 'sale_return',
+                referenceId: $return->id
+            );
+        });
+    }
+
+    private function calculateReturnCogs(SaleReturn $return): float
+    {
+        $saleItem = SaleItem::where('sale_id', $return->sale_id)
+            ->where('product_id', $return->product_id)
+            ->first();
+
+        return $saleItem ? ($saleItem->cost_price * $return->quantity) : 0;
     }
 
     public function approve(SaleReturn $return)
@@ -402,6 +525,4 @@ class SaleController extends Controller
 
         return response()->json(['message' => 'Return approved']);
     }
-
-    
 }

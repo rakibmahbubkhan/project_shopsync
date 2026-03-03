@@ -14,8 +14,22 @@ import Card from "@/components/Card.vue";
 
 const data = ref({});
 
+const stats = ref({
+  total_sales: 0,
+  total_revenue: 0,
+  gross_profit: 0,
+  low_stock_count: 0
+});
+
+const fetchDashboardStats = async () => {
+  const res = await api.get('/reports/dashboard');
+  stats.value = res.data;
+};
+
 onMounted(async () => {
   const response = await api.get("/reports/dashboard");
   data.value = response.data;
 });
+
+onMounted(fetchDashboardStats);
 </script>
