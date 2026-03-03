@@ -1,10 +1,14 @@
 <template>
-  <div class="flex h-screen bg-gray-100">
-    <Sidebar />
-    <div class="flex-1 flex flex-col">
+  <div class="flex h-screen w-full bg-gray-50 overflow-hidden font-sans">
+    
+    <Sidebar class="flex-shrink-0" />
+    
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
       <Navbar />
-      <main class="p-6 overflow-y-auto">
-        <router-view />
+      
+      <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <div class="max-w-[1600px] mx-auto"> <router-view />
+        </div>
       </main>
     </div>
   </div>

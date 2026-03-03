@@ -1,4 +1,4 @@
-<script setup>
+<!-- <script setup>
 import HelloWorld from './components/HelloWorld.vue'
 import TheWelcome from './components/TheWelcome.vue'
 </script>
@@ -36,13 +36,13 @@ header {
     flex-wrap: wrap;
   }
 }
-</style>
+</style> -->
 
 
 
-<!-- 
+
 <template>
-  <div class="min-h-screen bg-gray-100">
+  <div class="bg-gray-100">
     <Navbar />
     <div class="flex">
       <Sidebar />
@@ -54,6 +54,6 @@ header {
 </template>
 
 <script setup>
-import Navbar from '@/components/layout/Navbar.vue'
-import Sidebar from '@/components/layout/Sidebar.vue'
-</script> -->
+// import Navbar from '@/components/Navbar.vue'
+// import Sidebar from '@/components/Sidebar.vue'
+</script>
