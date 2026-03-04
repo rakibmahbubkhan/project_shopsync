@@ -11,6 +11,8 @@ use App\Http\Controllers\API\UserController;
 use App\Http\Controllers\API\ReportController;
 use App\Http\Controllers\API\AuditLogController;
 use App\Http\Controllers\API\FinancialReportController;
+    use App\Http\Controllers\API\AuthController;
+
 
 
     Route::middleware('auth:sanctum')->group(function () {
@@ -86,6 +88,9 @@ use App\Http\Controllers\API\FinancialReportController;
         Route::post('/returns/{return}/approve', [SaleController::class, 'approve']);
     });
 
+
+Route::post('/login', [AuthController::class, 'login']);
+Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
 
 
 
