@@ -23,13 +23,27 @@ class StorePurchaseRequest extends FormRequest
     {
         return [
             'supplier_id' => 'required|exists:suppliers,id',
-            'purchase_date' => 'required|date',
-            'payment_status' => 'required|in:pending,partial,paid',
-
+            'warehouse_id' => 'required|exists:warehouses,id',
+            'purchase_date' => 'nullable|date',
+            'status' => 'nullable|in:ordered,received,pending',
+            'paid_amount' => 'nullable|numeric|min:0',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
-            'items.*.quantity' => 'required|integer|min:1',
-            'items.*.cost_price' => 'required|numeric|min:0'
+            'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.purchase_price' => 'required|numeric|min:0',
+            'items.*.discount' => 'nullable|numeric|min:0|max:100',
+            'items.*.tax' => 'nullable|numeric|min:0|max:100',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'items.required' => 'At least one item is required',
+            'items.min' => 'At least one item is required',
+            'items.*.product_id.required' => 'Product is required for each item',
+            'items.*.quantity.required' => 'Quantity is required for each item',
+            'items.*.purchase_price.required' => 'Purchase price is required for each item',
         ];
     }
 }
