@@ -4,6 +4,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 
 class Purchase extends Model
 {
@@ -103,19 +104,25 @@ class Purchase extends Model
         return 0;
     }
 
-    public function getFormattedTotalAttribute()
+     public function getFormattedTotalAttribute(): string
     {
-        return number_format($this->total_amount, 2);
+        return $this->total_amount ? number_format((float) $this->total_amount, 2, '.', '') : '0.00';
     }
 
-    public function getFormattedPaidAttribute()
+    /**
+     * Get formatted paid amount
+     */
+    public function getFormattedPaidAttribute(): string
     {
-        return number_format($this->paid_amount, 2);
+        return $this->paid_amount ? number_format((float) $this->paid_amount, 2, '.', '') : '0.00';
     }
 
-    public function getFormattedDueAttribute()
+    /**
+     * Get formatted due amount
+     */
+    public function getFormattedDueAttribute(): string
     {
-        return number_format($this->due_amount, 2);
+        return $this->due_amount ? number_format((float) $this->due_amount, 2, '.', '') : '0.00';
     }
 
     // Mutators
@@ -198,7 +205,7 @@ class Purchase extends Model
                 'reference_id' => $this->id,
                 'type' => 'in',
                 'quantity' => $item->quantity,
-                'created_by' => auth()->id(),
+                'created_by' => Auth::id(),
             ]);
         }
         
