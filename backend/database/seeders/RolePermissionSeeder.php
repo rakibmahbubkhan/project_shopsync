@@ -18,13 +18,23 @@ class RolePermissionSeeder extends Seeder
     $manager = Role::create(['name' => 'manager']);
     $cashier = Role::create(['name' => 'cashier']);
 
+    $admin = Role::create(['name' => 'Admin']);
+    $admin->permissions()->attach(Permission::all());
+
+    $manager = Role::create(['name' => 'Manager']);
+    $manager->permissions()->attach(Permission::whereIn('name', ['view-inventory', 'process-sales'])->get());
+
     $permissions = [
         'manage_products',
         'manage_categories',
         'manage_purchases',
         'manage_sales',
         'view_reports',
-        'manage_users'
+        'manage_users',
+        'view-inventory',
+        'edit-inventory', 
+        'process-sales',
+        
     ];
 
     foreach ($permissions as $perm) {
@@ -47,6 +57,10 @@ class RolePermissionSeeder extends Seeder
             'manage_sales'
         ])->pluck('id')
     );
+
+    $permissions = [
+        
+    ];
 }
 
 }
