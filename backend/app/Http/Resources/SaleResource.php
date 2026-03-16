@@ -11,9 +11,11 @@ class SaleResource extends JsonResource
         return [
             'id' => $this->id,
             'customer_id' => $this->customer_id,
+            'customer' => $this->customer->name ?? 'Walk-in Customer',
             'warehouse_id' => $this->warehouse_id,
+            'warehouse' => $this->warehouse->name ?? 'N/A',
             'created_by' => $this->created_by,
-            'sale_date' => $this->sale_date,
+            'sale_date' => $this->sale_date->format('Y-m-d'),
             'payment_method' => $this->payment_method,
             'payment_status' => $this->payment_status,
             'discount' => $this->discount,
@@ -24,7 +26,15 @@ class SaleResource extends JsonResource
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
             
-            // Relationships
+            // Items with detailed information
+            'items' => $this->items->map(fn($item) => [
+                'product_name' => $item->product->name,
+                'quantity' => $item->quantity,
+                'price' => $item->selling_price,
+                'subtotal' => $item->subtotal
+            ]),
+            
+            // Keep the original relationship resources as comments for reference
             // 'customer' => new CustomerResource($this->whenLoaded('customer')),
             // 'items' => SaleItemResource::collection($this->whenLoaded('items')),
             // 'user' => new UserResource($this->whenLoaded('user')),

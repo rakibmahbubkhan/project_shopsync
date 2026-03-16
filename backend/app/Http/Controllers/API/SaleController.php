@@ -20,7 +20,6 @@ use Illuminate\Support\Facades\Auth;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 
-
 class SaleController extends Controller
 {
     use AuthorizesRequests;
@@ -39,7 +38,7 @@ class SaleController extends Controller
      */
     public function index(): SaleCollection
     {
-        $sales = Sale::with(['customer', 'user'])
+        $sales = Sale::with(['customer', 'user', 'warehouse'])
             ->latest()
             ->paginate(15);
 
@@ -53,7 +52,6 @@ class SaleController extends Controller
     {
         try {
             return DB::transaction(function () use ($request) {
-
                 $subtotalTotal = 0;
                 $totalCogs = 0;
                 $totalGrossProfit = 0;
@@ -165,11 +163,8 @@ class SaleController extends Controller
                     'id'      => $sale->id,
                     'sale'    => new SaleResource($sale)
                 ], 201);
-
             });
-
         } catch (\Exception $e) {
-            DB::rollBack();
             return response()->json([
                 'message' => 'Failed to create sale: ' . $e->getMessage()
             ], 500);
@@ -188,6 +183,8 @@ class SaleController extends Controller
                 'warehouse',
                 'items.product',
                 'returns.product',   
+                'returns.refund',
+                'returns.processedBy'
             ])
         );
     }
@@ -202,16 +199,15 @@ class SaleController extends Controller
 
             return DB::transaction(function () use ($request, $sale) {
                 // 1️⃣ Delete existing journal entries for this sale
-                // You'll need to implement this method in AccountingService
                 $this->accountingService->deleteEntry('sale', $sale->id);
 
-                // 2️⃣ Restore stock from old items using COST PRICE, not selling price
+                // 2️⃣ Restore stock from old items using COST PRICE
                 foreach ($sale->items as $oldItem) {
                     $this->stockService->increaseStock(
                         $oldItem->product_id,
                         $sale->warehouse_id,
                         $oldItem->quantity,
-                        $oldItem->cost_price, // FIXED: Use cost_price instead of selling_price
+                        $oldItem->cost_price,
                         'sale_update_restore',
                         $sale->id,
                         Auth::id()
@@ -310,8 +306,6 @@ class SaleController extends Controller
                     $sale->load(['customer', 'items.product'])
                 );
             });
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
-            return response()->json(['message' => 'Unauthorized to update this sale'], 403);
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Failed to update sale: ' . $e->getMessage()
@@ -325,19 +319,19 @@ class SaleController extends Controller
     public function destroy(Sale $sale): JsonResponse
     {
         try {
-            $this->authorize('delete', $sale);
             $this->validateSaleModifiable($sale);
 
             return DB::transaction(function () use ($sale) {
                 // 1️⃣ Delete journal entries
                 $this->accountingService->deleteEntry('sale', $sale->id);
+                
                 // 2️⃣ Restore stock for all items using COST PRICE
                 foreach ($sale->items as $item) {
                     $this->stockService->increaseStock(
                         $item->product_id,
                         $sale->warehouse_id,
                         $item->quantity,
-                        $item->cost_price, // FIXED: Use cost_price instead of selling_price
+                        $item->cost_price,
                         'sale_delete_restore',
                         $sale->id,
                         Auth::id()
@@ -352,8 +346,6 @@ class SaleController extends Controller
                     'sale_id' => $sale->id
                 ]);
             });
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
-            return response()->json(['message' => 'Unauthorized to delete this sale'], 403);
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Failed to delete sale: ' . $e->getMessage()
@@ -362,41 +354,29 @@ class SaleController extends Controller
     }
 
     /**
-     * Validate if sale can be modified.
-     *
-     * @throws \Exception
+     * Generate PDF receipt for sale.
      */
-    private function validateSaleModifiable(Sale $sale): void
+    public function receipt(Sale $sale)
     {
-        if ($sale->payment_status === 'paid') {
-            throw new \Exception('Paid sales cannot be modified.');
-        }
+        $sale->load(['items.product', 'customer', 'user', 'warehouse']);
+
+        $pdf = Pdf::loadView('receipts.sale', [
+            'sale' => $sale,
+            'company' => [
+                'name'    => config('app.name'),
+                'address' => config('app.address', 'Your Company Address'),
+                'phone'   => config('app.phone', 'Your Phone'),
+                'email'   => config('app.email', 'your@email.com'),
+                'tax_id'  => config('app.tax_id', 'Your Tax ID'),
+            ]
+        ]);
+
+        return $pdf->stream("invoice_{$sale->id}.pdf");
     }
 
     /**
-     * Get the appropriate account ID based on payment method.
+     * Process a return for a sale item.
      */
-    private function getPaymentAccountId(string $paymentMethod): int
-    {
-        return match($paymentMethod) {
-            'cash' => config('accounts.cash', 1),
-            'card' => config('accounts.accounts_receivable', 7),
-            'wallet' => config('accounts.wallet', 8),
-            default => config('accounts.accounts_receivable', 7),
-        };
-    }
-
-    public function receipt(Sale $sale)
-    {
-        $sale->load('items.product');
-
-        $pdf = Pdf::loadView('receipts.sale', [
-            'sale' => $sale
-        ]);
-
-        return $pdf->stream("receipt_{$sale->id}.pdf");
-    }
-
     public function returnItem(Request $request, Sale $sale)
     {
         $request->validate([
@@ -406,41 +386,58 @@ class SaleController extends Controller
             'reason'         => 'required|string|max:255',
         ]);
 
-        DB::transaction(function () use ($request, $sale) {
-            $return = $this->stockService->prepareSaleReturn(
-                $sale,
-                $request->product_id,
-                $request->quantity,
-                Auth::id(),
-                $request->reason
-            );
+        try {
+            return DB::transaction(function () use ($request, $sale) {
+                // Check if sale is modifiable
+                $this->validateSaleModifiable($sale);
 
-            $refundAmount = $return->refund_amount;
+                // Prepare return using StockService
+                $return = $this->stockService->prepareSaleReturn(
+                    $sale,
+                    $request->product_id,
+                    $request->quantity,
+                    Auth::id(),
+                    $request->reason
+                );
 
-            if ($refundAmount > config('pos.return_approval_threshold', 100)) {
-                $return->update([
-                    'status' => 'pending'
+                $refundAmount = $return->refund_amount;
+                $approvalThreshold = config('pos.return_approval_threshold', 100);
+
+                // Auto-approve if under threshold, otherwise mark as pending
+                if ($refundAmount <= $approvalThreshold) {
+                    $this->approveReturn($return, Auth::id());
+                    $message = 'Return processed successfully';
+                } else {
+                    $return->update(['status' => 'pending']);
+                    $message = 'Return submitted for approval';
+                }
+
+                $sale->load(['returns.product', 'returns.refund']);
+
+                return response()->json([
+                    'message' => $message,
+                    'return'  => $return->load(['product', 'processedBy']),
+                    'sale'    => new SaleResource($sale)
                 ]);
-            } else {
-                $this->approveReturn($return, Auth::id());
-            }
-        });
-
-        $sale->load(['returns.product', 'returns.refund']);
-
-        return response()->json([
-            'message' => 'Return submitted',
-            'sale' => new SaleResource($sale)
-        ]);
+            });
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to process return: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
+    /**
+     * Generate PDF receipt for return.
+     */
     public function returnReceipt(SaleReturn $return)
     {
         $return->load([
             'sale.customer',
             'sale.warehouse',
             'product',
-            'processedBy'
+            'processedBy',
+            'refund'
         ]);
 
         $pdf = Pdf::loadView('receipts.return', [
@@ -457,13 +454,18 @@ class SaleController extends Controller
         return $pdf->download("return_receipt_{$return->id}.pdf");
     }
 
-    public function approveReturn(SaleReturn $return, $managerId)
+    /**
+     * Approve a pending return.
+     */
+    public function approveReturn(SaleReturn $return, $managerId = null)
     {
-        DB::transaction(function () use ($return, $managerId) {
+        return DB::transaction(function () use ($return, $managerId) {
+            $approvedBy = $managerId ?? Auth::id();
+
             // Update return status
             $return->update([
                 'status' => 'approved',
-                'approved_by' => $managerId,
+                'approved_by' => $approvedBy,
                 'approved_at' => now()
             ]);
 
@@ -471,11 +473,11 @@ class SaleController extends Controller
             $this->stockService->finalizeSaleReturn($return);
 
             // Create refund record
-            Refund::create([
+            $refund = Refund::create([
                 'sale_return_id' => $return->id,
                 'payment_method' => $return->payment_method,
                 'amount'         => $return->refund_amount,
-                'processed_by'   => $managerId,
+                'processed_by'   => $approvedBy,
             ]);
 
             // Create accounting entry for the refund
@@ -501,9 +503,35 @@ class SaleController extends Controller
                 referenceType: 'sale_return',
                 referenceId: $return->id
             );
+
+            return $return;
         });
     }
 
+    /**
+     * API endpoint for approving returns.
+     */
+    public function approve(SaleReturn $return)
+    {
+        try {
+            $this->authorize('approve', $return);
+
+            $this->approveReturn($return);
+
+            return response()->json([
+                'message' => 'Return approved successfully',
+                'return' => $return->load(['product', 'refund'])
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to approve return: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Calculate COGS for returned items.
+     */
     private function calculateReturnCogs(SaleReturn $return): float
     {
         $saleItem = SaleItem::where('sale_id', $return->sale_id)
@@ -513,16 +541,33 @@ class SaleController extends Controller
         return $saleItem ? ($saleItem->cost_price * $return->quantity) : 0;
     }
 
-    public function approve(SaleReturn $return)
+    /**
+     * Validate if sale can be modified.
+     *
+     * @throws \Exception
+     */
+    private function validateSaleModifiable(Sale $sale): void
     {
-        if (!Auth::user()->can('approve_return')) {
-            abort(403);
+        if ($sale->payment_status === 'paid') {
+            throw new \Exception('Paid sales cannot be modified.');
         }
 
-        DB::transaction(function () use ($return) {
-            $this->approveReturn($return, Auth::id());
-        });
+        // Check if sale has any approved returns
+        if ($sale->returns()->where('status', 'approved')->exists()) {
+            throw new \Exception('Sales with approved returns cannot be modified.');
+        }
+    }
 
-        return response()->json(['message' => 'Return approved']);
+    /**
+     * Get the appropriate account ID based on payment method.
+     */
+    private function getPaymentAccountId(string $paymentMethod): int
+    {
+        return match($paymentMethod) {
+            'cash' => config('accounts.cash', 1),
+            'card' => config('accounts.bank', 7),
+            'wallet' => config('accounts.mobile_wallet', 8),
+            default => config('accounts.accounts_receivable', 9),
+        };
     }
 }
