@@ -56,14 +56,14 @@ Reports
 Settings
 
 
-1. User Management & Access Control
+ok 1. User Management & Access Control
 This module handles authentication, user profiles, and the Role-Based Access Control (RBAC) system to secure the agricultural machinery workshop's data.
 
 Key Files: UserController, AuthController, User, Role, and Permission.
 
 Logic: Managed via RoleMiddleware and CheckPermission middleware.
 
-2. Inventory & Product Management
+ok 2. Inventory & Product Management
 Manages the core database of machinery, parts, and their attributes.
 
 Products: Tracking individual items, their SKUs, and prices.
@@ -72,7 +72,7 @@ Classification: Organizing items via Category, Brand, and Unit (e.g., pieces, se
 
 Warehouses: Managing multiple storage locations for machinery parts.
 
-3. Sales & Point of Sale (POS)
+ok 3. Sales & Point of Sale (POS)
 The transaction engine for recording sales and generating receipts.
 
 POS System: A real-time interface for processing sales.
@@ -81,14 +81,14 @@ Sales Management: Tracking transaction history through SaleController and Sale m
 
 Customer Management: Maintaining a database of clients purchasing machinery.
 
-4. Purchases & Supplier Management
+ok 4. Purchases & Supplier Management
 Handles the acquisition of raw materials and parts from external vendors.
 
 Purchases: Recording incoming stock deliveries and costs.
 
 Suppliers: Managing vendor contact information and performance.
 
-5. Stock Operations
+ok 5. Stock Operations
 Detailed tracking of physical inventory movements across the workshop.
 
 Movement: Tracking stock changes via StockService and StockLog.
@@ -97,7 +97,7 @@ Adjustments & Transfers: Handling manual stock corrections and moving parts betw
 
 Auditing: Recording every change in the InventoryLedger.
 
-6. Accounting & Finance
+ok 6. Accounting & Finance
 The general ledger system that integrates business operations with financial records.
 
 General Ledger: Managed by AccountingService to create balanced JournalEntry records.
