@@ -3,38 +3,34 @@
 namespace App\Traits;
 
 use App\Models\AuditLog;
+use Illuminate\Support\Facades\Auth;
 
 trait Auditable
 {
     public static function bootAuditable()
     {
         static::created(function ($model) {
-            self::logActivity($model, 'created', null, $model->getAttributes());
+            static::logActivity($model, 'created');
         });
 
         static::updated(function ($model) {
-            self::logActivity(
-                $model,
-                'updated',
-                $model->getOriginal(),
-                $model->getChanges()
-            );
+            static::logActivity($model, 'updated');
         });
 
         static::deleted(function ($model) {
-            self::logActivity($model, 'deleted', $model->getOriginal(), null);
+            static::logActivity($model, 'deleted');
         });
     }
 
-    protected static function logActivity($model, $action, $oldValues, $newValues)
+    protected static function logActivity($model, $action)
     {
         AuditLog::create([
-            'user_id' => auth()->id(),
+            'user_id' => Auth::id(),
+            'auditable_type' => get_class($model),
+            'auditable_id' => $model->id,
             'action' => $action,
-            'model_type' => get_class($model),
-            'model_id' => $model->id,
-            'old_values' => $oldValues,
-            'new_values' => $newValues,
+            'old_values' => $action === 'updated' ? json_encode($model->getOriginal()) : null,
+            'new_values' => $action !== 'deleted' ? json_encode($model->getAttributes()) : null,
             'ip_address' => request()->ip(),
             'user_agent' => request()->userAgent(),
         ]);

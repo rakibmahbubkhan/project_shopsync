@@ -3,20 +3,27 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Models\AuditLog;
+use Illuminate\Http\Request;
 
 class AuditLogController extends Controller
 {
-    //
-
+    /**
+     * Display a list of system activities.
+     */
     public function index(Request $request)
     {
-        $logs = AuditLog::with('user')
-            ->latest()
-            ->paginate(20);
+        $query = AuditLog::with('user')->latest();
 
-        return response()->json($logs);
+        // Optional filtering by user or action
+        if ($request->user_id) {
+            $query->where('user_id', $request->user_id);
+        }
+        
+        if ($request->action) {
+            $query->where('action', $request->action);
+        }
+
+        return response()->json($query->paginate(20));
     }
-
 }
