@@ -16,7 +16,8 @@ html, body, #app {
   width: 6px;
 }
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-300 rounded-full;
+  background-color: #d1d5db;
+  border-radius: 9999px;
 }
 
 #app {

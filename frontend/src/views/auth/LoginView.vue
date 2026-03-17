@@ -1,49 +1,105 @@
 <template>
-  <div class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
-    <div class="text-center mb-8">
-      <h1 class="text-3xl font-bold text-primary">ShopSync</h1>
-      <p class="text-gray-500 mt-2">Sign in to your account</p>
+  <div class="min-h-screen flex items-center justify-center bg-gray-100">
+    <div class="bg-white p-8 rounded-2xl shadow-lg w-96">
+      <h2 class="text-2xl font-bold mb-6 text-center">Login</h2>
+      
+      <form @submit.prevent="handleLogin">
+        <div class="mb-4">
+          <label class="block text-sm font-medium mb-2">Email</label>
+          <input
+            v-model="form.email"
+            type="email"
+            class="w-full border rounded-lg p-2.5"
+            required
+          />
+        </div>
+        
+        <div class="mb-6">
+          <label class="block text-sm font-medium mb-2">Password</label>
+          <input
+            v-model="form.password"
+            type="password"
+            class="w-full border rounded-lg p-2.5"
+            required
+          />
+        </div>
+        
+        <div v-if="error" class="mb-4 text-red-600 text-sm text-center">
+          {{ error }}
+        </div>
+        
+        <button
+          type="submit"
+          :disabled="loading"
+          class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50"
+        >
+          {{ loading ? 'Logging in...' : 'Login' }}
+        </button>
+      </form>
     </div>
-
-    <form @submit.prevent="handleLogin" class="space-y-6">
-      <div>
-        <label class="block text-sm font-semibold text-gray-700 mb-1">Email</label>
-        <input v-model="form.email" type="email" required class="w-full px-4 py-3 border rounded-xl outline-none focus:ring-2 focus:ring-primary" placeholder="admin@example.com" />
-      </div>
-      <div>
-        <label class="block text-sm font-semibold text-gray-700 mb-1">Password</label>
-        <input v-model="form.password" type="password" required class="w-full px-4 py-3 border rounded-xl outline-none focus:ring-2 focus:ring-primary" placeholder="••••••••" />
-      </div>
-      <button type="submit" :disabled="loading" class="w-full bg-primary hover:bg-primary-dark text-white font-bold py-3 rounded-xl transition-all">
-        {{ loading ? 'Signing in...' : 'Login' }}
-      </button>
-      <p v-if="error" class="text-red-500 text-sm text-center">{{ error }}</p>
-    </form>
   </div>
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue';
+import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { useAuthStore } from '@/stores/authStore';
 import api from '@/api/axios';
 
 const router = useRouter();
-const auth = useAuthStore();
 const loading = ref(false);
 const error = ref('');
-const form = reactive({ email: '', password: '' });
+
+const form = ref({
+  email: '',
+  password: ''
+});
 
 const handleLogin = async () => {
   loading.value = true;
   error.value = '';
+  
   try {
-    const res = await api.post('/login', form);
-    auth.token = res.data.token;
-    auth.user = res.data.user;
-    router.push('/');
+    // Optional: Get CSRF cookie first (for Sanctum)
+    // await api.get('/sanctum/csrf-cookie');
+    
+    const response = await api.post('/login', form.value);
+    
+    if (response.data.success) {
+      // Store token and user data
+      localStorage.setItem('token', response.data.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.data.user));
+      
+      // Set default Authorization header
+      api.defaults.headers.common['Authorization'] = `Bearer ${response.data.data.token}`;
+      
+      // Redirect to dashboard
+      router.push('/dashboard');
+    }
   } catch (err) {
-    error.value = 'Invalid login credentials';
+    console.error('Login error:', err);
+    
+    if (err.response) {
+      // The request was made and the server responded with a status code
+      if (err.response.status === 401) {
+        error.value = 'Invalid email or password';
+      } else if (err.response.status === 422) {
+        error.value = 'Please check your input';
+      } else if (err.response.status === 500) {
+        error.value = 'Server error. Please try again later.';
+        // Log the error details in development
+        if (import.meta.env.DEV && err.response.data.debug) {
+          console.error('Server debug:', err.response.data.debug);
+        }
+      } else {
+        error.value = err.response.data.message || 'Login failed';
+      }
+    } else if (err.request) {
+      // The request was made but no response was received
+      error.value = 'No response from server. Please check your connection.';
+    } else {
+      // Something happened in setting up the request
+      error.value = 'Error setting up request';
+    }
   } finally {
     loading.value = false;
   }
