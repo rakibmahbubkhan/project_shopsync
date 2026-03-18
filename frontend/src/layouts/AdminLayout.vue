@@ -2,14 +2,14 @@
   <div class="flex h-screen w-full bg-gray-100 overflow-hidden">
     <!-- Sidebar - part of the flex layout, not fixed -->
     <Sidebar 
-      class="hidden md:flex transition-all duration-500 ease-in-out"
+      class="hidden md:block fixed left-0 top-0 h-screen transition-all duration-500 ease-in-out z-40"
       :class="sidebarWidth"
     />
 
     <!-- Main Content Area - automatically adjusts based on sidebar width -->
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
-      <Navbar />
-      <main class="flex-1 overflow-y-auto">
+      <Navbar class="ml-16"/>
+      <main class="flex-1 overflow-y-auto ml-16">
         <router-view />
       </main>
     </div>
