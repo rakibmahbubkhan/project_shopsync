@@ -3,27 +3,40 @@
 @import "tailwindcss";
 
 
-html, body, #app {
+html,
+body,
+#app {
   margin: 0;
   padding: 0;
   height: 100%;
   width: 100%;
-  overflow: hidden; /* Prevent double scrollbars; layout handles scrolling */
+  overflow: hidden;
+  /* Prevent double scrollbars; layout handles scrolling */
 }
 
 /* Custom scrollbar for a professional look */
 ::-webkit-scrollbar {
   width: 6px;
 }
+
 ::-webkit-scrollbar-thumb {
   background-color: #d1d5db;
   border-radius: 9999px;
+}
+.dashboard-view {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+/* Ensure the dashboard content fits properly */
+.dashboard-view .min-h-screen {
+  min-height: 100%;
 }
 
 #app {
   margin: 0 auto;
   padding: 2rem;
-  font-weight: normal;
 }
 
 a,
@@ -51,5 +64,3 @@ a,
     padding: 0 2rem;
   }
 }
-
-

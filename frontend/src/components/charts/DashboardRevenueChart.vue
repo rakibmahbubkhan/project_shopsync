@@ -3,9 +3,29 @@
 </template>
 
 <script setup>
-import { Line } from "vue-chartjs";
+import { Line } from 'vue-chartjs'
 import { ref, onMounted } from "vue";
 import api from "@/api/axios";
+import { 
+  Chart as ChartJS, 
+  Title, 
+  Tooltip, 
+  Legend, 
+  LineElement, 
+  LinearScale, 
+  PointElement, 
+  CategoryScale 
+} from 'chart.js'
+
+ChartJS.register(
+  Title, 
+  Tooltip, 
+  Legend, 
+  LineElement, 
+  LinearScale, 
+  PointElement, 
+  CategoryScale
+)
 
 const chartData = ref({
   labels: [],
@@ -25,4 +45,5 @@ onMounted(async () => {
   chartData.value.labels = response.data.labels;
   chartData.value.datasets[0].data = response.data.values;
 });
+
 </script>
