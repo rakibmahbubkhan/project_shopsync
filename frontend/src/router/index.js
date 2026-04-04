@@ -19,6 +19,7 @@ const routes = [
       // Sales & Returns
       { path: 'sales', name: 'sales', component: () => import('@/views/sales/SalesListView.vue') },
       { path: 'sales/return', name: 'return-create', component: () => import('@/views/sales/ReturnCreate.vue') },
+      { path: 'sales/:id', name: 'sale-details', component: () => import('@/views/sales/SaleDetailsView.vue') },
 
       // Purchases
       { path: 'purchases/create', name: 'purchase-create', component: () => import('@/views/purchases/PurchaseCreate.vue') },
