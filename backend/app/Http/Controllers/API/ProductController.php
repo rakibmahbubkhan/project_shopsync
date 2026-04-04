@@ -36,25 +36,34 @@ class ProductController extends Controller
         return response()->json($query->orderBy($sortField, $order)->paginate(10));
     }
 
+    public function create()
+    {
+        return response()->json([
+            'categories' => \App\Models\Category::all(),
+            'brands'     => \App\Models\Brand::all(),
+            'units'      => \App\Models\Unit::all(),
+            'warehouses' => \App\Models\Warehouse::all(),
+        ]);
+    }
+
     /**
      * Store a new agricultural part or machine.
      */
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'category_id' => 'required|exists:categories,id',
-            'brand_id' => 'nullable|exists:brands,id',
-            'unit_id' => 'required|exists:units,id',
-            'warehouse_id' => 'required|exists:warehouses,id',
-            'cost_price' => 'required|numeric|min:0',
-            'selling_price' => 'required|numeric|min:0',
-            'alert_quantity' => 'required|integer|min:0',
-            'initial_stock' => 'sometimes|integer|min:0',
-            'barcode' => 'nullable|string|unique:products,barcode',
-            'sku' => 'nullable|string|unique:products,sku',
-            'image' => 'nullable|image|max:2048',
-            'status' => 'sometimes|boolean',
+            'name'            => 'required|string|max:255',
+            'category_id'     => 'required|exists:categories,id',
+            'brand_id'        => 'nullable|exists:brands,id',
+            'unit_id'         => 'required|exists:units,id',
+            'cost_price'      => 'required|numeric|min:0',
+            'selling_price'   => 'required|numeric|min:0',
+            'alert_quantity'  => 'required|integer|min:0',
+            'warehouse_id'    => 'required|exists:warehouses,id',
+            'initial_stock'   => 'nullable|numeric|min:0',
+            'barcode'         => 'nullable|string|unique:products,barcode',
+            'image'           => 'nullable|image|max:2048',
+            'status'          => 'sometimes|boolean',
         ]);
 
         return DB::transaction(function () use ($validated, $request) {
@@ -64,42 +73,40 @@ class ProductController extends Controller
                 $imagePath = $request->file('image')->store('products', 'public');
             }
 
-            // Generate SKU if not provided
-            $sku = $validated['sku'] ?? $this->generateUniqueSKU();
+            // Auto-generate SKU if not provided
+            $sku = $validated['sku'] ?? ('SKU-' . strtoupper(uniqid()));
             
             // Set initial stock (default to 0 if not provided)
             $initialStock = $validated['initial_stock'] ?? 0;
             
-            // Create product with your actual field names
+            // Create product with all fields
             $product = Product::create([
-                'name' => $validated['name'],
-                'sku' => $sku,
-                'barcode' => $validated['barcode'] ?? null,
-                'category_id' => $validated['category_id'],
-                'brand_id' => $validated['brand_id'] ?? null,
-                'unit_id' => $validated['unit_id'],
-                'warehouse_id' => $validated['warehouse_id'],
-                'cost_price' => $validated['cost_price'],
-                'selling_price' => $validated['selling_price'],
+                'name'           => $validated['name'],
+                'sku'            => $sku,
+                'barcode'        => $validated['barcode'] ?? null,
+                'category_id'    => $validated['category_id'],
+                'brand_id'       => $validated['brand_id'] ?? null,
+                'unit_id'        => $validated['unit_id'],
+                'warehouse_id'   => $validated['warehouse_id'],
+                'cost_price'     => $validated['cost_price'],
+                'selling_price'  => $validated['selling_price'],
                 'stock_quantity' => $initialStock,
                 'alert_quantity' => $validated['alert_quantity'],
-                'image' => $imagePath,
-                'status' => $validated['status'] ?? true,
+                'image'          => $imagePath,
+                'status'         => $validated['status'] ?? true,
             ]);
 
-            // Log initial stock to InventoryLedger if initial stock > 0
+            // If initial stock is provided, use StockService for proper stock management
             if ($initialStock > 0) {
-                InventoryLedger::create([
-                    'product_id' => $product->id,
-                    'reference_type' => 'initial_stock',
-                    'reference_id' => $product->id,
-                    'movement_type' => 'in',
-                    'quantity' => $initialStock,
-                    'balance_after' => $initialStock,
-                    'unit_cost' => $validated['cost_price'],
-                    'total_cost' => $initialStock * $validated['cost_price'],
-                    'user_id' => Auth::id(),
-                ]);
+                app(\App\Services\StockService::class)->increaseStock(
+                    $product->id,
+                    $validated['warehouse_id'],
+                    $initialStock,
+                    $validated['cost_price'],
+                    'initial_entry',
+                    $product->id,
+                    Auth::id()
+                );
             }
 
             // Load relationships for response
@@ -153,27 +160,34 @@ class ProductController extends Controller
      * Delete a product if it has no transaction history.
      */
     public function destroy(Product $product)
-    {
-        // Check if product has any inventory ledger entries
-        if ($product->inventoryLedgers()->exists()) {
-            return response()->json([
-                'message' => 'Cannot delete product with inventory history.'
-            ], 422);
-        }
-
-        // Check if linked to sales or purchases
-        if ($product->saleItems()->exists() || $product->purchaseItems()->exists()) {
-            return response()->json([
-                'message' => 'Cannot delete product with transaction history.'
-            ], 422);
-        }
-
-        $product->delete();
-        
+{
+    // Prevent deletion if product has inventory ledger entries (stock history)
+    if ($product->inventoryLedgers()->exists()) {
         return response()->json([
-            'message' => 'Product deleted successfully'
-        ], 200);
+            'message' => 'Cannot delete product with inventory history.'
+        ], 422);
     }
+
+    // Prevent deletion if product has sale or purchase transaction history
+    if ($product->saleItems()->exists() || $product->purchaseItems()->exists()) {
+        return response()->json([
+            'message' => 'Cannot delete product with transaction history.'
+        ], 422);
+    }
+
+    // Prevent deletion if product has stock logs (alternative check for comprehensive coverage)
+    if ($product->stockLogs()->exists()) {
+        return response()->json([
+            'message' => 'Cannot delete product with stock transaction history.'
+        ], 422);
+    }
+
+    $product->delete();
+    
+    return response()->json([
+        'message' => 'Product deleted successfully'
+    ], 200);
+}
 
     /**
      * Helper to generate unique SKU for workshop parts.

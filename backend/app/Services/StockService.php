@@ -11,6 +11,7 @@ use App\Models\Sale;
 use App\Models\SaleReturn;
 use App\Models\Product;
 use App\Models\Warehouse;
+use App\Models\ProductStock;
 
 class StockService
 {
@@ -73,15 +74,8 @@ class StockService
      * 
      * @throws ValidationException if insufficient stock
      */
-    public function decreaseStock(
-        int $productId,
-        int $warehouseId,
-        float $quantity,
-        float $unitCost,
-        string $referenceType,
-        int $referenceId,
-        ?int $userId = null
-    ): void {
+    public function decreaseStock(int $productId,int $warehouseId,float $quantity,float $unitCost,string $referenceType,int $referenceId,?int $userId = null): void 
+    {
         DB::transaction(function () use (
             $productId,
             $warehouseId,
@@ -92,22 +86,19 @@ class StockService
             $userId
         ) {
             // Get stock record for this product in this warehouse
-            $stock = StockLog::where('product_id', $productId)
+            $stock = ProductStock::where('product_id', $productId)
                 ->where('warehouse_id', $warehouseId)
                 ->lockForUpdate()
                 ->first();
 
-            // Validate stock exists
-            if (!$stock) {
+            // Fix: If record is missing or insufficient stock, provide descriptive error
+            $actualStock = $stock ? $stock->quantity : 0;
+            
+            if (!$stock || $actualStock < $quantity) {
                 throw ValidationException::withMessages([
-                    'stock' => "Product ID {$productId} has no stock in warehouse ID {$warehouseId}"
-                ]);
-            }
-
-            // Validate sufficient stock
-            if ($stock->quantity < $quantity) {
-                throw ValidationException::withMessages([
-                    'stock' => "Insufficient stock for Product ID {$productId} in warehouse ID {$warehouseId}. Available: {$stock->quantity}, Requested: {$quantity}"
+                    'stock' => "Insufficient stock in warehouse. " .
+                            "Product ID: {$productId}, Warehouse ID: {$warehouseId}, " .
+                            "Requested: {$quantity}, Available: {$actualStock}"
                 ]);
             }
 
@@ -206,12 +197,8 @@ class StockService
     /**
      * Get stock movements for a product
      */
-    public function getStockMovements(
-        int $productId, 
-        ?int $warehouseId = null,
-        ?string $fromDate = null,
-        ?string $toDate = null
-    ) {
+    public function getStockMovements(int $productId, ?int $warehouseId = null,?string $fromDate = null,?string $toDate = null) 
+    {
         $query = InventoryLedger::with(['user', 'warehouse'])
             ->where('product_id', $productId)
             ->orderBy('created_at', 'desc');
@@ -236,20 +223,18 @@ class StockService
      */
     public function getAverageCost(int $productId, int $warehouseId): float
     {
-        // Get the latest purchase or receiving cost
-        $latestIn = InventoryLedger::where('product_id', $productId)
+        // Get warehouse-specific stock record with average cost
+        $stock = ProductStock::where('product_id', $productId)
             ->where('warehouse_id', $warehouseId)
-            ->where('movement_type', 'in')
-            ->latest()
             ->first();
 
-        // Fallback to product's cost price if no ledger entries
-        if (!$latestIn) {
+        // Fallback to product's cost price if no warehouse-specific cost exists or avg_cost is invalid
+        if (!$stock || $stock->avg_cost <= 0) {
             $product = Product::find($productId);
             return $product ? $product->cost_price : 0;
         }
 
-        return $latestIn->unit_cost;
+        return $stock->avg_cost;
     }
 
     /**

@@ -9,13 +9,20 @@ use Illuminate\Database\Eloquent\Model;
         protected $fillable = [
             'user_id',
             'action',
-            'model_type',
-            'model_id',
+            'auditable_type', // Add this
+            'auditable_id',   // Add this
             'old_values',
             'new_values',
             'ip_address',
-            'user_agent'
+            'user_agent',
+            'created_at',
+            'updated_at'
         ];
+
+        public function auditable()
+        {
+            return $this->morphTo();
+        }
 
         protected $casts = [
             'old_values' => 'array',

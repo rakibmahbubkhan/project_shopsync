@@ -26,13 +26,15 @@ trait Auditable
     {
         AuditLog::create([
             'user_id' => Auth::id(),
-            'auditable_type' => get_class($model),
-            'auditable_id' => $model->id,
-            'action' => $action,
-            'old_values' => $action === 'updated' ? json_encode($model->getOriginal()) : null,
-            'new_values' => $action !== 'deleted' ? json_encode($model->getAttributes()) : null,
+            'action' => 'updated',
+            'old_values' => json_encode($model->getOriginal()),
+            'new_values' => json_encode($model->getChanges()),
             'ip_address' => request()->ip(),
             'user_agent' => request()->userAgent(),
+            'auditable_type' => get_class($model), 
+            'auditable_id' => $model->id,
+            'updated_at' => now(),
+            'created_at' => now(),
         ]);
     }
 }

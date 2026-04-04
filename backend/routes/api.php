@@ -113,6 +113,8 @@ use App\Http\Controllers\API\ReturnController;
 use App\Http\Controllers\API\AuditLogController;
 use App\Http\Controllers\API\CustomerController;
 use App\Http\Controllers\API\WarehouseController;
+use App\Http\Controllers\API\BrandController;
+use App\Http\Controllers\API\UnitController;
 
 // Public Auth Routes
 Route::post('/login', [AuthController::class, 'login']);
@@ -126,6 +128,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('users', UserController::class);
 
     // 2. Inventory & Products
+    Route::get('products/create', [ProductController::class, 'create']); 
+    Route::apiResource('products', ProductController::class);
+    Route::apiResource('categories', CategoryController::class);
+    
+    Route::apiResource('brands', BrandController::class);
+    Route::apiResource('units', UnitController::class);
+
+    Route::apiResource('warehouses', WarehouseController::class);
     Route::apiResource('products', ProductController::class);
     Route::apiResource('categories', CategoryController::class);
 
