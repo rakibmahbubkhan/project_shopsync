@@ -24,6 +24,7 @@ return new class extends Migration
         $table->enum('movement_type', ['in', 'out']);
 
         $table->integer('quantity');
+        $table->integer('balance_before');
         $table->integer('balance_after');
         $table->foreignId('warehouse_id')
                 ->constrained()

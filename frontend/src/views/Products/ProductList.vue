@@ -436,7 +436,7 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from "vue";
 import SmartTable from "@/components/SmartTable.vue";
-import axios from 'axios';
+import api from '@/api/axios';
 
 // Table reference and key for refresh
 const productTable = ref(null);
@@ -505,10 +505,10 @@ const onTableDataLoaded = (data) => {
 onMounted(async () => {
   try {
     const [categoriesRes, brandsRes, unitsRes, warehousesRes] = await Promise.all([
-      axios.get('/categories'),
-      axios.get('/brands'),
-      axios.get('/units'),
-      axios.get('/warehouses')
+      api.get('/categories'),
+      api.get('/brands'),
+      api.get('/units'),
+      api.get('/warehouses')
     ]);
     
     categories.value = categoriesRes.data;
@@ -597,9 +597,9 @@ const saveProduct = async () => {
     let response;
     if (isEditing.value) {
       formData.append('_method', 'PUT');
-      response = await axios.post(`/products/${editingId.value}`, formData);
+      response = await api.post(`/products/${editingId.value}`, formData);
     } else {
-      response = await axios.post('/products', formData);
+      response = await api.post('/products', formData);
     }
     
     closeModal();
@@ -625,7 +625,7 @@ const saveProduct = async () => {
 const confirmDelete = async (id) => {
   if (confirm('Are you sure you want to delete this product? This action cannot be undone.')) {
     try {
-      await axios.delete(`/products/${id}`);
+      await api.delete(`/products/${id}`);
       tableKey.value += 1;
       alert('Product deleted successfully!');
     } catch (error) {
