@@ -308,15 +308,15 @@ const pageTitle = computed(() => {
   }
   
   const titles = {
-    '/pos': 'Point of Sale',
-    '/products': 'Inventory Management',
-    '/sales': 'Sales History',
-    '/purchases': 'Purchase Management',
-    '/users': 'Staff Management',
-    '/financial': 'Financial Reports',
-    '/reports': 'Analytics & Reports'
+    '/pos': 'ShopSync ERP | Point of Sale',
+    '/products': 'ShopSync ERP | Inventory Management',
+    '/sales': 'ShopSync ERP | Sales History',
+    '/purchases': 'ShopSync ERP | Purchase Management',
+    '/users': 'ShopSync ERP | Staff Management',
+    '/financial': 'ShopSync ERP | Financial Reports',
+    '/reports': 'ShopSync ERP | Analytics & Reports'
   };
-  return titles[route.path] || 'Overview';
+  return titles[route.path] || 'Dashboard';
 });
 
 const currentPage = computed(() => {
