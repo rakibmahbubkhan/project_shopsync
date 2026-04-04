@@ -111,6 +111,8 @@ use App\Http\Controllers\API\FinancialReportController;
 use App\Http\Controllers\API\ReportController;
 use App\Http\Controllers\API\ReturnController;
 use App\Http\Controllers\API\AuditLogController;
+use App\Http\Controllers\API\CustomerController;
+use App\Http\Controllers\API\WarehouseController;
 
 // Public Auth Routes
 Route::post('/login', [AuthController::class, 'login']);
@@ -153,6 +155,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // 9. System Auditing
     Route::get('audit-logs', [AuditLogController::class, 'index']);
+
+    Route::apiResource('customers', CustomerController::class);
+    Route::apiResource('warehouses', WarehouseController::class);
 });
 
 

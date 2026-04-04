@@ -4,12 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use App\Traits\Auditable;
+use Illuminate\Database\Eloquent\Factories\HasFactory; 
+
 
 
 class Product extends Model
 {
 
-use Auditable;
+    use HasFactory, Auditable;
     protected $fillable = [
         'name',
         'sku',

@@ -6,38 +6,31 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
+    public function up()
     {
+        Schema::dropIfExists('audit_logs');
+        
         Schema::create('audit_logs', function (Blueprint $table) {
-        $table->id();
-
-        $table->foreignId('user_id')
-            ->nullable()
-            ->constrained()
-            ->nullOnDelete();
-
-        $table->string('action'); // created, updated, deleted
-        $table->string('model_type'); // App\Models\Product
-        $table->unsignedBigInteger('model_id');
-
-        $table->json('old_values')->nullable();
-        $table->json('new_values')->nullable();
-
-        $table->ipAddress('ip_address')->nullable();
-        $table->text('user_agent')->nullable();
-
-        $table->timestamps();
-    });
-
+            $table->id();
+            $table->unsignedBigInteger('user_id')->nullable();
+            $table->string('auditable_type');
+            $table->unsignedBigInteger('auditable_id');
+            $table->string('action');
+            $table->json('old_values')->nullable();
+            $table->json('new_values')->nullable();
+            $table->string('ip_address')->nullable();
+            $table->text('user_agent')->nullable();
+            $table->timestamps();
+            
+            // Add indexes for better performance
+            $table->index(['auditable_type', 'auditable_id']);
+            $table->index('user_id');
+            $table->index('action');
+            $table->index('created_at');
+        });
     }
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
+    public function down()
     {
         Schema::dropIfExists('audit_logs');
     }
