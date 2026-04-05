@@ -46,6 +46,18 @@ class Product extends Model
         return $this->belongsTo(Unit::class);
     }
 
+    public function warehouses()
+    {
+        return $this->belongsToMany(Warehouse::class, 'product_stocks')
+                    ->withPivot('quantity', 'avg_cost', 'last_purchase_price')
+                    ->withTimestamps();
+    }
+
+    public function stocks()
+    {
+        return $this->hasMany(ProductStock::class);
+    }
+
     public function purchaseItems()
     {
         return $this->hasMany(PurchaseItem::class);
@@ -61,6 +73,9 @@ class Product extends Model
         return $this->hasMany(StockLog::class);
     }
 
+    public function inventoryLedger() {
+        return $this->hasMany(InventoryLedger::class);
+    }
 
 }
 

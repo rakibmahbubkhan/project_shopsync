@@ -580,41 +580,37 @@ const handleImageUpload = (event) => {
 // Save product (create or update)
 const saveProduct = async () => {
   isSubmitting.value = true;
-  
   try {
     const formData = new FormData();
     
+    // Iterate through form keys
     Object.keys(form).forEach(key => {
-      if (form[key] !== null && form[key] !== '') {
-        if (key === 'image' && form.image) {
-          formData.append('image', form.image);
-        } else {
-          formData.append(key, form[key]);
-        }
+      if (key === 'status') {
+        // ✅ Convert boolean to 1 or 0 for Laravel validation
+        formData.append('status', form.status ? '1' : '0');
+      } else if (form[key] !== null && form[key] !== undefined) {
+        formData.append(key, form[key]);
       }
     });
 
-    let response;
     if (isEditing.value) {
-      formData.append('_method', 'PUT');
-      response = await api.post(`/products/${editingId.value}`, formData);
+      // Use _method spoofing for PUT requests with FormData
+      formData.append('_method', 'PUT'); 
+      await api.post(`/products/${editingId.value}`, formData);
     } else {
-      response = await api.post('/products', formData);
+      await api.post('/products', formData);
     }
     
-    closeModal();
-    tableKey.value += 1;
-    
-    alert(`Product ${isEditing.value ? 'updated' : 'created'} successfully!`);
-    
+    showModal.value = false;
+    alert("Product saved successfully!");
+    location.reload(); 
   } catch (error) {
-    console.error('Error saving product:', error);
-    
-    if (error.response?.data?.errors) {
-      const errors = Object.values(error.response.data.errors).flat();
-      alert(errors.join('\n'));
+    // Log the actual validation errors from the server for better debugging
+    if (error.response?.status === 422) {
+      console.error("Validation Errors:", error.response.data.errors);
+      alert("Validation Error: " + JSON.stringify(error.response.data.errors));
     } else {
-      alert('Failed to save product. Please try again.');
+      alert("Error saving product");
     }
   } finally {
     isSubmitting.value = false;
