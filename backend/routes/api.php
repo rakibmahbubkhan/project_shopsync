@@ -129,13 +129,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // 2. Inventory & Products
     Route::get('products/create', [ProductController::class, 'create']); 
-    Route::apiResource('products', ProductController::class);
-    Route::apiResource('categories', CategoryController::class);
-    
-    Route::apiResource('brands', BrandController::class);
-    Route::apiResource('units', UnitController::class);
+    Route::get('categories', [CategoryController::class, 'index']);
+    Route::get('brands', [BrandController::class, 'index']);
 
-    Route::apiResource('warehouses', WarehouseController::class);
+    Route::get('units', [UnitController::class, 'index']);
+    Route::get('warehouses', [WarehouseController::class, 'index']);
+
     Route::apiResource('products', ProductController::class);
     Route::apiResource('categories', CategoryController::class);
 

@@ -13,11 +13,9 @@ class BrandController extends Controller
      *
      * @return \Illuminate\Http\JsonResponse
      */
-    public function index()
+    public function index() 
     {
-        $brands = Brand::all();
-        
-        return response()->json($brands);
+        return response()->json(Brand::all());
     }
 
     /**

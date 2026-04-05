@@ -23,6 +23,8 @@ return new class extends Migration
             ->cascadeOnDelete();
 
         $table->integer('quantity')->default(0);
+        $table->decimal('avg_cost', 15, 2)->default(0);
+        $table->decimal('last_purchase_price', 15, 2)->default(0);
 
         $table->unique(['product_id', 'warehouse_id']);
 

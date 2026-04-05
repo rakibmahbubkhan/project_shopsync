@@ -504,19 +504,20 @@ const onTableDataLoaded = (data) => {
 // Fetch required data on mount
 onMounted(async () => {
   try {
-    const [categoriesRes, brandsRes, unitsRes, warehousesRes] = await Promise.all([
+    const [cRes, bRes, uRes, wRes] = await Promise.all([
       api.get('/categories'),
       api.get('/brands'),
       api.get('/units'),
       api.get('/warehouses')
     ]);
     
-    categories.value = categoriesRes.data;
-    brands.value = brandsRes.data;
-    units.value = unitsRes.data;
-    warehouses.value = warehousesRes.data;
+    // Check if your API returns { data: [...] } or just [...]
+    categories.value = cRes.data.data || cRes.data;
+    brands.value = bRes.data.data || bRes.data;
+    units.value = uRes.data.data || uRes.data;
+    warehouses.value = wRes.data.data || wRes.data;
   } catch (error) {
-    console.error('Error fetching data:', error);
+    console.error("Dropdown load failed:", error);
   }
 });
 
@@ -583,35 +584,33 @@ const saveProduct = async () => {
   try {
     const formData = new FormData();
     
-    // Iterate through form keys
     Object.keys(form).forEach(key => {
-      if (key === 'status') {
-        // ✅ Convert boolean to 1 or 0 for Laravel validation
-        formData.append('status', form.status ? '1' : '0');
+      if (key === 'image') {
+        // ✅ ONLY append if it's a File object (user picked a new one)
+        // If it's a string, it's the old URL; don't send it to the 'image' validator.
+        if (form.image instanceof File) {
+          formData.append('image', form.image);
+        }
+      } else if (key === 'status') {
+        formData.append('status', form.status ? '1' : '0'); // Fix Boolean
       } else if (form[key] !== null && form[key] !== undefined) {
         formData.append(key, form[key]);
       }
     });
 
     if (isEditing.value) {
-      // Use _method spoofing for PUT requests with FormData
+      // ✅ Spoof PUT for multipart/form-data
       formData.append('_method', 'PUT'); 
-      await api.post(`/products/${editingId.value}`, formData);
+      await api.post(`/products/${editingId.value}`, formData); 
     } else {
       await api.post('/products', formData);
     }
     
     showModal.value = false;
-    alert("Product saved successfully!");
+    alert("Success!");
     location.reload(); 
   } catch (error) {
-    // Log the actual validation errors from the server for better debugging
-    if (error.response?.status === 422) {
-      console.error("Validation Errors:", error.response.data.errors);
-      alert("Validation Error: " + JSON.stringify(error.response.data.errors));
-    } else {
-      alert("Error saving product");
-    }
+    console.error("Save failed:", error.response?.data);
   } finally {
     isSubmitting.value = false;
   }

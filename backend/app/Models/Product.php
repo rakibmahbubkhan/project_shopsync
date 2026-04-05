@@ -31,36 +31,13 @@ class Product extends Model
         'status' => 'boolean',
     ];
 
-    public function category()
-    {
-        return $this->belongsTo(Category::class);
-    }
+    public function category() { return $this->belongsTo(Category::class); }
+    public function brand()    { return $this->belongsTo(Brand::class); }
+    public function unit()     { return $this->belongsTo(Unit::class); }
 
-    public function brand()
+    public function inventoryLedgers()
     {
-        return $this->belongsTo(Brand::class);
-    }
-
-    public function unit()
-    {
-        return $this->belongsTo(Unit::class);
-    }
-
-    public function warehouses()
-    {
-        return $this->belongsToMany(Warehouse::class, 'product_stocks')
-                    ->withPivot('quantity', 'avg_cost', 'last_purchase_price')
-                    ->withTimestamps();
-    }
-
-    public function stocks()
-    {
-        return $this->hasMany(ProductStock::class);
-    }
-
-    public function purchaseItems()
-    {
-        return $this->hasMany(PurchaseItem::class);
+        return $this->hasMany(InventoryLedger::class);
     }
 
     public function saleItems()
@@ -68,13 +45,25 @@ class Product extends Model
         return $this->hasMany(SaleItem::class);
     }
 
+    public function purchaseItems()
+    {
+        return $this->hasMany(PurchaseItem::class);
+    }
+
+    public function stocks()
+    {
+        return $this->hasMany(ProductStock::class);
+    }
+
+    public function warehouses()
+    {
+        return $this->belongsToMany(Warehouse::class, 'product_stocks')
+                    ->withPivot('quantity', 'avg_cost', 'last_purchase_price');
+    }
+
     public function stockLogs()
     {
         return $this->hasMany(StockLog::class);
-    }
-
-    public function inventoryLedger() {
-        return $this->hasMany(InventoryLedger::class);
     }
 
 }

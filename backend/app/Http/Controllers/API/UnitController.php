@@ -15,9 +15,7 @@ class UnitController extends Controller
      */
     public function index()
     {
-        $units = Unit::all();
-        
-        return response()->json($units);
+        return response()->json(Unit::all());
     }
 
     /**

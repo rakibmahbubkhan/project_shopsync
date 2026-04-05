@@ -144,22 +144,18 @@ class ProductController extends Controller
             'brand_id' => 'nullable|exists:brands,id',
             'unit_id' => 'required|exists:units,id',
             'warehouse_id' => 'required|exists:warehouses,id',
-            'cost_price' => 'required|numeric|min:0',
-            'selling_price' => 'required|numeric|min:0',
+            'cost_price' => 'required|numeric',
+            'selling_price' => 'required|numeric',
             'alert_quantity' => 'required|integer|min:0',
             'barcode' => ['nullable', 'string', Rule::unique('products')->ignore($product->id)],
             'image' => 'nullable|image|max:2048',
-            'status' => 'boolean'
+            'status' => 'required|in:0,1,true,false',
         ]);
 
         return DB::transaction(function () use ($validated, $request, $product) {
-            // Handle image upload if present
             if ($request->hasFile('image')) {
                 $validated['image'] = $request->file('image')->store('products', 'public');
             }
-
-            // Remove warehouse_id from update if you don't want to allow warehouse changes
-            // or add logic to handle warehouse changes with inventory transfer
             
             $product->update($validated);
 
@@ -175,32 +171,31 @@ class ProductController extends Controller
      */
     public function destroy(Product $product)
     {
-        // Prevent deletion if product has inventory ledger entries (stock history)
-        if ($product->inventoryLedgers()->exists()) {
-            return response()->json([
-                'message' => 'Cannot delete product with inventory history.'
-            ], 422);
-        }
+        try {
+            return DB::transaction(function () use ($product) {
+                // 1. Check if the product is in any sales/purchases
+                if ($product->saleItems()->exists() || $product->purchaseItems()->exists()) {
+                    return response()->json([
+                        'message' => 'Cannot delete product: It has transaction history (Sales/Purchases).'
+                    ], 422);
+                }
 
-        // Prevent deletion if product has sale or purchase transaction history
-        if ($product->saleItems()->exists() || $product->purchaseItems()->exists()) {
-            return response()->json([
-                'message' => 'Cannot delete product with transaction history.'
-            ], 422);
-        }
+                // 2. Safe to delete related stock records first
+                $product->stocks()->delete();
+                
+                // 3. Delete related ledger entries (Only if you want to wipe dev data)
+                $product->inventoryLedgers()->delete();
 
-        // Prevent deletion if product has stock logs (alternative check for comprehensive coverage)
-        if ($product->stockLogs()->exists()) {
-            return response()->json([
-                'message' => 'Cannot delete product with stock transaction history.'
-            ], 422);
-        }
+                // 4. Finally delete the product
+                $product->delete();
 
-        $product->delete();
-        
-        return response()->json([
-            'message' => 'Product deleted successfully'
-        ], 200);
+                return response()->json(['message' => 'Product and related stock data deleted successfully.']);
+            });
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Delete failed: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
