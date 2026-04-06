@@ -2,9 +2,9 @@
   <div class="smart-table-container">
     <!-- Header Actions -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-      <!-- Search Box -->
-      <div class="relative w-full sm:w-80">
-        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+      <!-- Search Box - Made Wider -->
+      <div class="relative w-full sm:w-96 md:w-[32rem]">
+        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
           <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
@@ -13,15 +13,19 @@
           v-model="searchTerm"
           @input="debouncedSearch"
           type="text"
-          placeholder="Search products, SKU, or barcode..."
-          class="w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-xl focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100 outline-none transition-all"
+          placeholder="Search products, SKU, barcode, or category..."
+          class="w-full pl-11 pr-12 py-3 border-2 border-gray-200 rounded-xl focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 outline-none transition-all text-base"
         />
         <div v-if="searchTerm" class="absolute inset-y-0 right-0 pr-3 flex items-center">
-          <button @click="clearSearch" class="text-gray-400 hover:text-gray-600">
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button @click="clearSearch" class="text-gray-400 hover:text-gray-600 p-1">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
+        </div>
+        <!-- Search Tips -->
+        <div v-if="searchTerm && rows.length > 0" class="absolute mt-1 text-xs text-gray-400">
+          Found {{ meta.total }} result(s)
         </div>
       </div>
 
@@ -30,7 +34,7 @@
         <!-- Export Button -->
         <button 
           @click="exportData" 
-          class="px-4 py-2 text-gray-600 hover:text-gray-800 border-2 border-gray-200 rounded-xl hover:border-indigo-300 transition-all flex items-center gap-2"
+          class="px-5 py-2.5 text-gray-600 hover:text-gray-800 border-2 border-gray-200 rounded-xl hover:border-indigo-400 hover:bg-indigo-50 transition-all flex items-center gap-2 font-medium"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -41,7 +45,7 @@
         <!-- Refresh Button -->
         <button 
           @click="refreshData" 
-          class="px-4 py-2 text-gray-600 hover:text-gray-800 border-2 border-gray-200 rounded-xl hover:border-indigo-300 transition-all flex items-center gap-2"
+          class="px-5 py-2.5 text-gray-600 hover:text-gray-800 border-2 border-gray-200 rounded-xl hover:border-indigo-400 hover:bg-indigo-50 transition-all flex items-center gap-2 font-medium"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -153,15 +157,15 @@
       </div>
     </template>
 
-    <!-- Pagination -->
-    <div v-if="meta.last_page > 1 && !loading" class="flex flex-col sm:flex-row justify-between items-center gap-4 mt-6 pt-4 border-t border-gray-200">
+    <!-- Enhanced Pagination -->
+    <div v-if="meta.last_page > 1 && !loading" class="flex flex-col lg:flex-row justify-between items-center gap-4 mt-6 pt-4 border-t border-gray-200">
       <!-- Per Page Selector -->
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 order-2 lg:order-1">
         <span class="text-sm text-gray-600">Show</span>
         <select
           v-model="perPage"
           @change="changePerPage"
-          class="border-2 border-gray-200 rounded-lg px-2 py-1 text-sm focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100 outline-none"
+          class="border-2 border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 outline-none cursor-pointer"
         >
           <option :value="10">10</option>
           <option :value="25">25</option>
@@ -172,59 +176,88 @@
       </div>
 
       <!-- Page Info -->
-      <div class="text-sm text-gray-600">
-        Showing {{ meta.from || 0 }} to {{ meta.to || 0 }} of {{ meta.total || 0 }} entries
+      <div class="text-sm text-gray-600 order-1 lg:order-2">
+        Showing <span class="font-semibold text-gray-800">{{ meta.from || 0 }}</span> 
+        to <span class="font-semibold text-gray-800">{{ meta.to || 0 }}</span> 
+        of <span class="font-semibold text-gray-800">{{ meta.total || 0 }}</span> entries
       </div>
 
       <!-- Pagination Controls -->
-      <div class="flex gap-2">
+      <div class="flex flex-wrap justify-center gap-2 order-3">
+        <!-- First Page -->
         <button
           @click="changePage(1)"
           :disabled="meta.current_page === 1"
           class="px-3 py-2 text-gray-600 hover:text-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-lg"
+          title="First page"
         >
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
           </svg>
         </button>
         
+        <!-- Previous -->
         <button
           @click="changePage(meta.current_page - 1)"
           :disabled="meta.current_page === 1"
-          class="px-4 py-2 text-gray-600 hover:text-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-lg border border-gray-200 hover:border-indigo-300"
+          class="px-4 py-2 text-gray-600 hover:text-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-lg border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50"
         >
           Previous
         </button>
         
-        <!-- Page Numbers -->
-        <div class="hidden md:flex gap-1">
-          <button
-            v-for="page in visiblePages"
-            :key="page"
-            @click="changePage(page)"
-            :class="[
-              'px-3 py-2 rounded-lg transition-all',
-              meta.current_page === page
-                ? 'bg-indigo-600 text-white shadow-md'
-                : 'text-gray-600 hover:bg-gray-100'
-            ]"
-          >
-            {{ page }}
-          </button>
+        <!-- Page Numbers with improved design -->
+        <div class="hidden md:flex gap-1.5">
+          <template v-for="page in visiblePages" :key="page">
+            <button
+              v-if="page !== '...'"
+              @click="changePage(page)"
+              :class="[
+                'min-w-[40px] h-10 px-3 rounded-lg font-medium transition-all',
+                meta.current_page === page
+                  ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-200 scale-105'
+                  : 'text-gray-600 hover:bg-gray-100 hover:scale-105'
+              ]"
+            >
+              {{ page }}
+            </button>
+            <span 
+              v-else 
+              class="px-2 py-2 text-gray-400 select-none"
+            >
+              ...
+            </span>
+          </template>
         </div>
         
+        <!-- Mobile: Quick Jump -->
+        <div class="md:hidden flex items-center gap-2">
+          <span class="text-sm text-gray-500">Page</span>
+          <input
+            type="number"
+            :value="meta.current_page"
+            @change="changePage(parseInt($event.target.value))"
+            :min="1"
+            :max="meta.last_page"
+            class="w-16 px-2 py-1.5 text-center border-2 border-gray-200 rounded-lg focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none"
+          />
+          <span class="text-sm text-gray-500">of {{ meta.last_page }}</span>
+        </div>
+        
+        <!-- Next -->
         <button
           @click="changePage(meta.current_page + 1)"
           :disabled="meta.current_page === meta.last_page"
-          class="px-4 py-2 text-gray-600 hover:text-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-lg border border-gray-200 hover:border-indigo-300"
+          class="px-4 py-2 text-gray-600 hover:text-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-lg border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50"
         >
           Next
         </button>
         
+        <!-- Last Page -->
         <button
           @click="changePage(meta.last_page)"
           :disabled="meta.current_page === meta.last_page"
           class="px-3 py-2 text-gray-600 hover:text-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-lg"
+          title="Last page"
         >
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
@@ -273,7 +306,7 @@ const searchTerm = ref("");
 const loading = ref(false);
 const sortBy = ref(props.defaultSort);
 const order = ref(props.defaultOrder);
-const perPage = ref(10);
+const perPage = ref(25);
 
 let searchTimeout = null;
 
@@ -415,7 +448,6 @@ const refreshData = () => {
 
 // Export data
 const exportData = () => {
-  // Implement export logic (CSV, Excel, etc.)
   console.log('Export functionality can be implemented here');
   alert('Export feature - can implement CSV/Excel export');
 };
@@ -474,5 +506,16 @@ defineExpose({
 
 .animate-spin {
   animation: spin 1s linear infinite;
+}
+
+/* Hide number input arrows */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
 }
 </style>

@@ -141,8 +141,14 @@
             <!-- Custom Name Column with Image -->
             <template #cell-name="{ row }">
               <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex items-center justify-center">
-                  <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="w-10 h-10 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
+                  <img 
+                    v-if="row.image" 
+                    :src="getImageUrl(row.image)" 
+                    :alt="row.name"
+                    class="w-full h-full object-cover"
+                  />
+                  <svg v-else class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
@@ -262,16 +268,40 @@
               </select>
             </div>
 
-            <!-- Image Upload -->
+            <!-- Image Upload with Preview -->
             <div>
               <label class="block text-sm font-semibold text-gray-700 mb-2">Product Image</label>
               <div class="border-2 border-dashed border-gray-300 rounded-xl p-4 hover:border-blue-400 transition-colors">
+                <!-- Image Preview -->
+                <div v-if="imagePreview" class="mb-3 flex justify-center">
+                  <div class="relative inline-block">
+                    <img 
+                      :src="imagePreview" 
+            alt="Product preview" 
+                      class="w-32 h-32 object-cover rounded-lg border-2 border-gray-200"
+                    />
+                    <button 
+                      type="button"
+                      @click="removeImage"
+                      class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                      title="Remove image"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                
+                <!-- File Input -->
                 <input 
                   type="file" 
                   @change="handleImageUpload" 
                   accept="image/*"
+                  ref="imageInput"
                   class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
                 />
+                <p class="text-xs text-gray-400 mt-2">Recommended: Square image, max 2MB</p>
               </div>
             </div>
 
@@ -454,6 +484,11 @@ const isEditing = ref(false);
 const isSubmitting = ref(false);
 const editingId = ref(null);
 
+
+const imagePreview = ref(null);
+const imageInput = ref(null);
+const existingImagePath = ref(null);
+
 // Form state
 const form = reactive({
   name: '',
@@ -504,18 +539,14 @@ const onTableDataLoaded = (data) => {
 // Fetch required data on mount
 onMounted(async () => {
   try {
-    const [cRes, bRes, uRes, wRes] = await Promise.all([
-      api.get('/categories'),
-      api.get('/brands'),
-      api.get('/units'),
-      api.get('/warehouses')
-    ]);
+    // Use the new optimized endpoint for form data
+    const formDataResponse = await api.get('/products/form-data');
+    const formData = formDataResponse.data;
     
-    // Check if your API returns { data: [...] } or just [...]
-    categories.value = cRes.data.data || cRes.data;
-    brands.value = bRes.data.data || bRes.data;
-    units.value = uRes.data.data || uRes.data;
-    warehouses.value = wRes.data.data || wRes.data;
+    categories.value = formData.categories;
+    brands.value = formData.brands;
+    units.value = formData.units;
+    warehouses.value = formData.warehouses;
   } catch (error) {
     console.error("Dropdown load failed:", error);
   }
@@ -537,6 +568,13 @@ const resetForm = () => {
   form.image = null;
   form.status = true;
   editingId.value = null;
+
+   // Reset preview
+  imagePreview.value = null;
+  existingImagePath.value = null;
+  if (imageInput.value) {
+    imageInput.value.value = '';
+  }
 };
 
 // Open modal for creating new product
@@ -564,6 +602,21 @@ const editProduct = (product) => {
   form.stock_quantity = product.stock_quantity;
   form.alert_quantity = product.alert_quantity;
   form.status = product.status;
+
+  // Set image preview for existing image
+  if (product.image) {
+    existingImagePath.value = product.image;
+    imagePreview.value = getImageUrl(product.image);
+  } else {
+    existingImagePath.value = null;
+    imagePreview.value = null;
+  }
+  
+  // Reset the file input
+  form.image = null;
+  if (imageInput.value) {
+    imageInput.value.value = '';
+  }
   
   showModal.value = true;
 };
@@ -578,46 +631,108 @@ const closeModal = () => {
 const handleImageUpload = (event) => {
   const file = event.target.files[0];
   if (file) {
+    // Check file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Image size must be less than 2MB');
+      event.target.value = '';
+      return;
+    }
+    
+    // Check file type
+    if (!file.type.match(/image\/(jpeg|png|jpg|gif)/)) {
+      alert('Please upload a valid image file (JPEG, PNG, JPG, or GIF)');
+      event.target.value = '';
+      return;
+    }
+    
     form.image = file;
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      imagePreview.value = e.target.result;
+    };
+    reader.readAsDataURL(file);
+    
+    // Clear existing image path since we're using a new image
+    existingImagePath.value = null;
   } else {
     form.image = null;
   }
 };
 
-// Save product (create or update)
+
+
+// Helper function to get full image URL
+const getImageUrl = (imagePath) => {
+  if (!imagePath) return '';
+  if (imagePath.startsWith('http')) return imagePath;
+  
+  const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+  return `${baseUrl}/storage/${imagePath}`;
+};
+
+// Remove image
+const removeImage = () => {
+  form.image = null;
+  imagePreview.value = null;
+  existingImagePath.value = null;
+  if (imageInput.value) {
+    imageInput.value.value = '';
+  }
+};
+
 // Save product (create or update)
 const saveProduct = async () => {
   isSubmitting.value = true;
   try {
     const formData = new FormData();
     
-    // Iterate through form keys
-    Object.keys(form).forEach(key => {
-      if (key === 'image') {
-        // ✅ Only append if it's an actual File object (new upload)
-        if (form.image instanceof File) {
-          formData.append('image', form.image);
-        }
-        // ✅ If image is null/undefined, don't append anything
-      } else if (key === 'status') {
-        // Ensure status is sent as 1 or 0 for robust backend parsing
-        formData.append('status', form.status ? '1' : '0');
-      } else if (form[key] !== null && form[key] !== undefined && form[key] !== '') {
-        formData.append(key, form[key]);
-      }
-    });
-
+    // Handle each form field carefully
+    if (form.name) formData.append('name', form.name);
+    if (form.category_id) formData.append('category_id', form.category_id);
+    if (form.brand_id) formData.append('brand_id', form.brand_id);
+    if (form.unit_id) formData.append('unit_id', form.unit_id);
+    if (form.sku) formData.append('sku', form.sku);
+    if (form.barcode) formData.append('barcode', form.barcode);
+    if (form.cost_price !== '' && form.cost_price !== null) formData.append('cost_price', form.cost_price);
+    if (form.selling_price !== '' && form.selling_price !== null) formData.append('selling_price', form.selling_price);
+    if (form.alert_quantity !== '' && form.alert_quantity !== null) formData.append('alert_quantity', form.alert_quantity);
+    if (form.stock_quantity !== '' && form.stock_quantity !== null) formData.append('stock_quantity', form.stock_quantity);
+    
+    // Handle status - convert to 0/1
+    formData.append('status', form.status ? '1' : '0');
+    
+    // Handle warehouse_id only for new products
+    if (!isEditing.value && form.warehouse_id) {
+      formData.append('warehouse_id', form.warehouse_id);
+    }
+    
+    // Handle image - ONLY if it's an actual File object (new upload)
+    if (form.image instanceof File) {
+      formData.append('image', form.image);
+    }
+    
+    let response;
     if (isEditing.value) {
-      // ✅ Crucial: Use POST but spoof PUT for multipart/form-data support
-      formData.append('_method', 'PUT'); 
-      await api.post(`/products/${editingId.value}`, formData);
+      // For PUT requests with file upload, use POST with _method=PUT
+      formData.append('_method', 'PUT');
+      response = await api.post(`/products/${editingId.value}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
     } else {
-      await api.post('/products', formData);
+      response = await api.post('/products', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
     }
     
     showModal.value = false;
     alert("Product saved successfully!");
-    // Refresh the table without page reload
+    // Refresh the table
     tableKey.value += 1;
     
   } catch (error) {
@@ -626,10 +741,15 @@ const saveProduct = async () => {
     // Show specific validation errors
     if (error.response?.data?.errors) {
       const errors = error.response.data.errors;
-      const errorMessages = Object.values(errors).flat().join('\n');
-      alert(`Validation Error:\n${errorMessages}`);
+      const errorMessages = [];
+      for (const [field, messages] of Object.entries(errors)) {
+        errorMessages.push(`${field}: ${messages.join(', ')}`);
+      }
+      alert(`Validation Error:\n${errorMessages.join('\n')}`);
+    } else if (error.response?.data?.message) {
+      alert(error.response.data.message);
     } else {
-      alert("Validation Error: " + (error.response?.data?.message || "Check console"));
+      alert("An error occurred while saving the product.");
     }
   } finally {
     isSubmitting.value = false;

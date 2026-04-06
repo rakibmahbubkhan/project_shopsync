@@ -128,6 +128,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('users', UserController::class);
 
     // 2. Inventory & Products
+
+    Route::get('/products/form-data', [ProductController::class, 'getFormData']);
+
     Route::get('products/create', [ProductController::class, 'create']); 
     Route::get('categories', [CategoryController::class, 'index']);
     Route::get('brands', [BrandController::class, 'index']);
