@@ -586,31 +586,33 @@ const saveProduct = async () => {
     
     Object.keys(form).forEach(key => {
       if (key === 'image') {
-        // ✅ ONLY append if it's a File object (user picked a new one)
-        // If it's a string, it's the old URL; don't send it to the 'image' validator.
+        // ✅ ONLY append if it is a File object (user picked a new image)
+        // If it's a string (existing URL), skip it to avoid validation errors
         if (form.image instanceof File) {
           formData.append('image', form.image);
         }
       } else if (key === 'status') {
-        formData.append('status', form.status ? '1' : '0'); // Fix Boolean
+        // Convert boolean to 1/0 for robust backend handling
+        formData.append('status', form.status ? '1' : '0');
       } else if (form[key] !== null && form[key] !== undefined) {
         formData.append(key, form[key]);
       }
     });
 
     if (isEditing.value) {
-      // ✅ Spoof PUT for multipart/form-data
+      // ✅ Use _method spoofing for PUT requests with FormData
       formData.append('_method', 'PUT'); 
-      await api.post(`/products/${editingId.value}`, formData); 
+      await api.post(`/products/${editingId.value}`, formData);
     } else {
       await api.post('/products', formData);
     }
     
     showModal.value = false;
-    alert("Success!");
+    alert("Product saved successfully!");
     location.reload(); 
   } catch (error) {
     console.error("Save failed:", error.response?.data);
+    alert("Error: " + (error.response?.data?.message || "Check console for details"));
   } finally {
     isSubmitting.value = false;
   }

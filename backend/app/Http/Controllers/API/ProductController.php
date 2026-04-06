@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Storage;
 
 class ProductController extends Controller
 {
@@ -151,10 +152,16 @@ class ProductController extends Controller
             'image' => 'nullable|image|max:2048',
             'status' => 'required|in:0,1,true,false',
         ]);
-
-        return DB::transaction(function () use ($validated, $request, $product) {
+        
             if ($request->hasFile('image')) {
+                // Delete old image if it exists
+                if ($product->image) {
+                    Storage::disk('public')->delete($product->image);
+                }
                 $validated['image'] = $request->file('image')->store('products', 'public');
+            } 
+            else {
+                unset($validated['image']);
             }
             
             $product->update($validated);
@@ -163,7 +170,6 @@ class ProductController extends Controller
                 'message' => 'Product updated successfully',
                 'product' => $product->load(['category', 'brand', 'unit', 'warehouses'])
             ]);
-        });
     }
 
     /**
