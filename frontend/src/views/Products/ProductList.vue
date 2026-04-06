@@ -198,7 +198,7 @@
         </div>
         
         <!-- Modal Body -->
-        <form @submit.prevent="saveProduct" class="p-6 space-y-5">
+        <form enctype="multipart/form-data" @submit.prevent="saveProduct" class="p-6 space-y-5">
           <!-- Product Name -->
           <div>
             <label class="block text-sm font-semibold text-gray-700 mb-2">
@@ -262,8 +262,21 @@
               </select>
             </div>
 
-            <!-- Warehouse Selection -->
+            <!-- Image Upload -->
             <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-2">Product Image</label>
+              <div class="border-2 border-dashed border-gray-300 rounded-xl p-4 hover:border-blue-400 transition-colors">
+                <input 
+                  type="file" 
+                  @change="handleImageUpload" 
+                  accept="image/*"
+                  class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                />
+              </div>
+            </div>
+
+            <!-- Warehouse Selection - Only visible when creating a new product -->
+            <div v-if="!isEditing">
               <label class="block text-sm font-semibold text-gray-700 mb-2">
                 Warehouse <span class="text-red-500">*</span>
               </label>
@@ -355,7 +368,7 @@
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Initial Stock</label>
                 <input 
-                  v-model="form.initial_stock" 
+                  v-model="form.stock_quantity" 
                   type="number" 
                   min="0"
                   placeholder="0" 
@@ -375,19 +388,6 @@
                 />
                 <p class="text-xs text-gray-400 mt-1">Low stock notification threshold</p>
               </div>
-            </div>
-          </div>
-
-          <!-- Image Upload -->
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">Product Image</label>
-            <div class="border-2 border-dashed border-gray-300 rounded-xl p-4 hover:border-blue-400 transition-colors">
-              <input 
-                type="file" 
-                @change="handleImageUpload" 
-                accept="image/*"
-                class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
-              />
             </div>
           </div>
 
@@ -465,7 +465,7 @@ const form = reactive({
   barcode: '',
   cost_price: '',
   selling_price: '',
-  initial_stock: 0,
+  stock_quantity: '',
   alert_quantity: '',
   image: null,
   status: true
@@ -532,7 +532,7 @@ const resetForm = () => {
   form.barcode = '';
   form.cost_price = '';
   form.selling_price = '';
-  form.initial_stock = 0;
+  form.stock_quantity = '';
   form.alert_quantity = '';
   form.image = null;
   form.status = true;
@@ -561,6 +561,7 @@ const editProduct = (product) => {
   form.barcode = product.barcode || '';
   form.cost_price = product.cost_price;
   form.selling_price = product.selling_price;
+  form.stock_quantity = product.stock_quantity;
   form.alert_quantity = product.alert_quantity;
   form.status = product.status;
   
@@ -575,32 +576,39 @@ const closeModal = () => {
 
 // Handle image upload
 const handleImageUpload = (event) => {
-  form.image = event.target.files[0];
+  const file = event.target.files[0];
+  if (file) {
+    form.image = file;
+  } else {
+    form.image = null;
+  }
 };
 
+// Save product (create or update)
 // Save product (create or update)
 const saveProduct = async () => {
   isSubmitting.value = true;
   try {
     const formData = new FormData();
     
+    // Iterate through form keys
     Object.keys(form).forEach(key => {
       if (key === 'image') {
-        // ✅ ONLY append if it is a File object (user picked a new image)
-        // If it's a string (existing URL), skip it to avoid validation errors
+        // ✅ Only append if it's an actual File object (new upload)
         if (form.image instanceof File) {
           formData.append('image', form.image);
         }
+        // ✅ If image is null/undefined, don't append anything
       } else if (key === 'status') {
-        // Convert boolean to 1/0 for robust backend handling
+        // Ensure status is sent as 1 or 0 for robust backend parsing
         formData.append('status', form.status ? '1' : '0');
-      } else if (form[key] !== null && form[key] !== undefined) {
+      } else if (form[key] !== null && form[key] !== undefined && form[key] !== '') {
         formData.append(key, form[key]);
       }
     });
 
     if (isEditing.value) {
-      // ✅ Use _method spoofing for PUT requests with FormData
+      // ✅ Crucial: Use POST but spoof PUT for multipart/form-data support
       formData.append('_method', 'PUT'); 
       await api.post(`/products/${editingId.value}`, formData);
     } else {
@@ -609,10 +617,20 @@ const saveProduct = async () => {
     
     showModal.value = false;
     alert("Product saved successfully!");
-    location.reload(); 
+    // Refresh the table without page reload
+    tableKey.value += 1;
+    
   } catch (error) {
     console.error("Save failed:", error.response?.data);
-    alert("Error: " + (error.response?.data?.message || "Check console for details"));
+    
+    // Show specific validation errors
+    if (error.response?.data?.errors) {
+      const errors = error.response.data.errors;
+      const errorMessages = Object.values(errors).flat().join('\n');
+      alert(`Validation Error:\n${errorMessages}`);
+    } else {
+      alert("Validation Error: " + (error.response?.data?.message || "Check console"));
+    }
   } finally {
     isSubmitting.value = false;
   }

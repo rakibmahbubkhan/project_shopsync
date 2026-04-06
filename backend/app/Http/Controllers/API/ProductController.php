@@ -61,7 +61,7 @@ class ProductController extends Controller
         'selling_price'   => 'required|numeric|min:0',
         'alert_quantity'  => 'required|integer|min:0',
         'warehouse_id'    => 'required|exists:warehouses,id',
-        'initial_stock'   => 'nullable|numeric|min:0',
+        'stock_quantity'   => 'nullable|numeric|min:0',
         'barcode'         => 'nullable|string|unique:products,barcode',
         'image'           => 'nullable|image|max:2048',
         'status'          => 'sometimes|boolean',
@@ -78,7 +78,7 @@ class ProductController extends Controller
         $sku = $validated['sku'] ?? ('SKU-' . strtoupper(uniqid()));
         
         // Set initial stock (default to 0 if not provided)
-        $initialStock = $validated['initial_stock'] ?? 0;
+        $initialStock = $validated['stock_quantity'] ?? 0;
         
         // Create product with all fields
         $product = Product::create([
@@ -137,40 +137,40 @@ class ProductController extends Controller
     /**
      * Update product details.
      */
-    public function update(Request $request, Product $product)
-    {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'category_id' => 'required|exists:categories,id',
-            'brand_id' => 'nullable|exists:brands,id',
-            'unit_id' => 'required|exists:units,id',
-            'warehouse_id' => 'required|exists:warehouses,id',
-            'cost_price' => 'required|numeric',
-            'selling_price' => 'required|numeric',
-            'alert_quantity' => 'required|integer|min:0',
-            'barcode' => ['nullable', 'string', Rule::unique('products')->ignore($product->id)],
-            'image' => 'nullable|image|max:2048',
-            'status' => 'required|in:0,1,true,false',
-        ]);
-        
-            if ($request->hasFile('image')) {
-                // Delete old image if it exists
-                if ($product->image) {
-                    Storage::disk('public')->delete($product->image);
-                }
-                $validated['image'] = $request->file('image')->store('products', 'public');
-            } 
-            else {
-                unset($validated['image']);
-            }
-            
-            $product->update($validated);
 
-            return response()->json([
-                'message' => 'Product updated successfully',
-                'product' => $product->load(['category', 'brand', 'unit', 'warehouses'])
-            ]);
+    public function update(Request $request, Product $product)
+{
+    $validated = $request->validate([
+        'name' => 'required|string|max:255',
+        'category_id' => 'required|exists:categories,id',
+        'brand_id' => 'nullable|exists:brands,id',
+        'unit_id' => 'required|exists:units,id',
+        'cost_price' => 'required|numeric|min:0',
+        'selling_price' => 'required|numeric|min:0',
+        'alert_quantity' => 'required|integer|min:0',
+        'stock_quantity' => 'nullable|integer|min:0',
+        'status' => 'required|in:0,1,true,false',
+        'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048' // ✅ Already nullable
+    ]);
+
+    // Handle image upload
+    if ($request->hasFile('image')) {
+        if ($product->image) {
+            Storage::disk('public')->delete($product->image);
+        }
+        $validated['image'] = $request->file('image')->store('products', 'public');
+    } else {
+        // ✅ Remove image from validated data if not present
+        unset($validated['image']);
     }
+
+    // ✅ Remove stock_quantity from validated data as it shouldn't be updated here
+    unset($validated['stock_quantity']);
+
+    $product->update($validated);
+
+    return response()->json($product->load(['category', 'brand', 'unit', 'warehouses']));
+}
 
     /**
      * Delete a product if it has no transaction history.
