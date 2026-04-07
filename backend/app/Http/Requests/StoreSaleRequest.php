@@ -16,7 +16,7 @@ class StoreSaleRequest extends FormRequest
         return [
             'customer_id' => 'nullable|exists:customers,id',
             'sale_date' => 'required|date',
-            'payment_method' => 'required|in:cash,card,bank,mobile',
+            'payment_method' => 'required|in:cash,card,wallet', 
             'payment_status' => 'required|in:pending,partial,paid',
             'discount' => 'nullable|numeric|min:0',
             'tax' => 'nullable|numeric|min:0',

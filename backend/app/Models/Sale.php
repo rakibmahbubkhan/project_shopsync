@@ -8,11 +8,11 @@ class Sale extends Model
 {
     protected $fillable = [
         'customer_id',
-        'warehouse_id', // Added
+        'warehouse_id',
         'created_by',
         'total_amount',
-        'total_cogs',   // Added
-        'gross_profit', // Added
+        'total_cogs',
+        'gross_profit',
         'discount',
         'tax',
         'payment_method',
@@ -49,4 +49,3 @@ class Sale extends Model
         return $this->hasMany(SaleReturn::class);
     }
 }
-
