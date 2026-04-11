@@ -264,7 +264,6 @@
 import { ref, computed, onMounted, watch } from "vue";
 import api from "@/api/axios";
 
-// Payment methods
 const paymentMethods = [
   { value: 'cash', label: 'Cash' },
   { value: 'card', label: 'Card' },
@@ -282,9 +281,9 @@ const selectedWarehouse = ref(null);
 const paymentMethod = ref('cash');
 const loading = ref(false);
 
-// Search products
+// 1. Improved Search with standardized data access
 const searchProducts = async () => {
-  if (!search.value) {
+  if (!search.value || search.value.length < 2) {
     products.value = [];
     return;
   }
@@ -295,80 +294,76 @@ const searchProducts = async () => {
       warehouse_id: selectedWarehouse.value || undefined 
     };
     const res = await api.get('/products', { params });
-    products.value = res.data.data || [];
+    // Handle both wrapped and unwrapped Laravel responses
+    products.value = res.data.data || res.data || [];
   } catch (error) {
-    console.error('Error searching products:', error);
+    console.error('Search failed:', error);
   }
 };
 
-// Add to cart with stock validation
+// 2. Standardized Cart Logic
 const addToCart = (product) => {
-  const availableStock = product.stock_quantity || product.stock;
+  // Use a fallback to ensure we always have a number for stock
+  const availableStock = Number(product.stock_quantity || product.stock || 0);
   
+  if (availableStock <= 0) {
+    alert("This item is out of stock in the selected warehouse.");
+    return;
+  }
+
   const exists = cart.value.find(i => i.id === product.id);
   if (exists) {
     if (exists.quantity < availableStock) {
       exists.quantity++;
     } else {
-      alert(`Only ${availableStock} items available in stock`);
+      alert(`Insufficient stock. Only ${availableStock} units available.`);
     }
   } else {
     cart.value.push({ 
       ...product, 
       quantity: 1,
-      stock: availableStock
+      stock: availableStock // Lock the stock value into the cart item
     });
   }
 };
 
-// Cart item controls
 const increaseQty = (item) => {
   if (item.quantity < item.stock) {
     item.quantity++;
   } else {
-    alert(`Only ${item.stock} items available in stock`);
+    alert("Maximum available stock reached.");
   }
 };
 
 const decreaseQty = (item) => {
-  if (item.quantity > 1) {
-    item.quantity--;
-  }
+  if (item.quantity > 1) item.quantity--;
 };
 
 const removeFromCart = (id) => {
   cart.value = cart.value.filter(i => i.id !== id);
 };
 
-// Computed totals
+// Totals
 const subtotal = computed(() => 
-  cart.value.reduce((sum, i) => sum + (i.selling_price * i.quantity), 0)
+  cart.value.reduce((sum, i) => sum + (Number(i.selling_price) * i.quantity), 0)
 );
-
 const tax = computed(() => subtotal.value * 0.05);
-
 const total = computed(() => subtotal.value + tax.value);
 
-// Checkout
+// 3. Robust Checkout with better error parsing
 const checkout = async () => {
-  // Validate selections
   if (!selectedCustomer.value || !selectedWarehouse.value) {
-    alert("Please select a customer and warehouse");
+    alert("Please select both a Customer and a Warehouse.");
     return;
   }
   
-  if (!cart.value.length) {
-    alert("Cart is empty. Please add items to continue.");
-    return;
-  }
-
   loading.value = true;
   
   try {
     const payload = {
       customer_id: selectedCustomer.value,
       warehouse_id: selectedWarehouse.value,
-      sale_date: new Date().toISOString().slice(0, 10),
+      sale_date: new Date().toISOString().split('T')[0],
       payment_method: paymentMethod.value,
       payment_status: 'paid',
       tax: tax.value,
@@ -382,36 +377,31 @@ const checkout = async () => {
     
     const res = await api.post('/sales', payload);
     
-    // Open receipt
     if (res.data?.id) {
       const receiptUrl = `${import.meta.env.VITE_API_URL}/sales/${res.data.id}/receipt`;
       window.open(receiptUrl, '_blank');
     }
     
-    // Reset POS
+    // Reset state
     cart.value = [];
     search.value = "";
     products.value = [];
-    
-    alert(`Sale #${res.data.id} completed successfully!`);
+    alert("Transaction completed successfully!");
     
   } catch (error) {
     console.error('Checkout error:', error);
-    const errorMessage = error.response?.data?.message || error.message || "Checkout Failed";
-    alert(`Transaction Failed: ${errorMessage}`);
+    const msg = error.response?.data?.message || "Server Error: Infinite recursion or database constraint.";
+    alert(`Transaction Failed: ${msg}`);
   } finally {
     loading.value = false;
   }
 };
 
-// Watch for warehouse change to refresh product search
 watch(selectedWarehouse, () => {
-  if (search.value) {
-    searchProducts();
-  }
+  if (search.value) searchProducts();
 });
 
-// Load initial data
+// 4. Clean Metadata Loading
 onMounted(async () => {
   try {
     const [cRes, wRes] = await Promise.all([
@@ -422,16 +412,10 @@ onMounted(async () => {
     customers.value = cRes.data.data || cRes.data || [];
     warehouses.value = wRes.data.data || wRes.data || [];
     
-    // Set defaults
-    if (customers.value.length) {
-      selectedCustomer.value = customers.value[0].id;
-    }
-    if (warehouses.value.length) {
-      selectedWarehouse.value = warehouses.value[0].id;
-    }
+    if (customers.value.length > 0) selectedCustomer.value = customers.value[0].id;
+    if (warehouses.value.length > 0) selectedWarehouse.value = warehouses.value[0].id;
   } catch (error) {
-    console.error('Error loading metadata:', error);
-    alert('Failed to load customers and warehouses');
+    console.error('Initialization failed:', error);
   }
 });
 </script>

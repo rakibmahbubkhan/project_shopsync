@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory; 
+use App\Http\Resources\ProductResource;
 
 
 
@@ -30,6 +31,10 @@ class Product extends Model
     protected $casts = [
         'status' => 'boolean',
     ];
+
+    public function index() {
+    return ProductResource::collection(Product::with(['category', 'stocks'])->get());
+}
 
     public function category() { return $this->belongsTo(Category::class); }
     public function brand()    { return $this->belongsTo(Brand::class); }

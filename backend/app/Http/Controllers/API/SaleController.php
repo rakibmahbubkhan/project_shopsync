@@ -19,6 +19,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class SaleController extends Controller
 {
@@ -48,160 +49,120 @@ class SaleController extends Controller
     /**
      * Store a newly created sale.
      */
-    public function store(StoreSaleRequest $request)
-    {
-        try {
-            return DB::transaction(function () use ($request) {
-                $subtotalTotal = 0;
-                $totalCogs = 0;
-                $totalGrossProfit = 0;
-
-                // 1️⃣ Create Sale Header
-                $sale = Sale::create([
-                    'customer_id'    => $request->customer_id,
-                    'warehouse_id'   => $request->warehouse_id,
-                    'created_by'     => Auth::id(),
-                    'sale_date'      => $request->sale_date,
-                    'payment_method' => $request->payment_method,
-                    'payment_status' => $request->payment_status,
-                    'discount'       => $request->discount ?? 0,
-                    'tax'            => $request->tax ?? 0,
-                    'total_amount'   => 0,
-                    'total_cogs'     => 0,
-                    'gross_profit'   => 0,
-                ]);
-
-                // 2️⃣ Process Each Item
-                foreach ($request->items as $item) {
-                    $costPrice = $this->stockService->getAverageCost(
-                        $item['product_id'],
-                        $sale->warehouse_id
-                    );
-
-                    $quantity = $item['quantity'];
-                    $sellingPrice = $item['selling_price'];
-
-                    $subtotal = $quantity * $sellingPrice;
-                    $cogs = $quantity * $costPrice;
-                    $grossProfit = $subtotal - $cogs;
-
-                    $subtotalTotal += $subtotal;
-                    $totalCogs += $cogs;
-                    $totalGrossProfit += $grossProfit;
-
-                    SaleItem::create([
-                        'sale_id'       => $sale->id,
-                        'product_id'    => $item['product_id'],
-                        'quantity'      => $quantity,
-                        'selling_price' => $sellingPrice,
-                        'cost_price'    => $costPrice,
-                        'subtotal'      => $subtotal,
-                        'gross_profit'  => $grossProfit,
-                    ]);
-
-                    $this->stockService->decreaseStock(
-                        $item['product_id'],
-                        $sale->warehouse_id,
-                        $quantity,
-                        $costPrice,
-                        'sale',
-                        $sale->id,
-                        Auth::id()
-                    );
-                }
-
-                // 3️⃣ Calculate Final Total
-                $finalTotal = $subtotalTotal
-                    - ($request->discount ?? 0)
-                    + ($request->tax ?? 0);
-
-                // 4️⃣ Update Sale Header with Financial Data
-                $sale->update([
-                    'total_amount' => $finalTotal,
-                    'total_cogs'   => $totalCogs,
-                    'gross_profit' => $totalGrossProfit,
-                ]);
-
-                // 5️⃣ Post Financial Journal Entry
-                $lines = [
-                    // Debit: Cash or Accounts Receivable
-                    ['account_id' => $this->getPaymentAccountId($request->payment_method), 'debit' => $finalTotal, 'credit' => 0],
-                    
-                    // Credit: Sales Revenue
-                    ['account_id' => config('accounts.sales_revenue', 2), 'debit' => 0, 'credit' => $subtotalTotal],
-                    
-                    // Debit: COGS
-                    ['account_id' => config('accounts.cogs', 3), 'debit' => $totalCogs, 'credit' => 0],
-                    
-                    // Credit: Inventory Asset
-                    ['account_id' => config('accounts.inventory', 4), 'debit' => 0, 'credit' => $totalCogs],
-                ];
-
-                // Add tax line if applicable
-                if ($request->tax > 0) {
-                    $lines[] = ['account_id' => config('accounts.tax_payable', 5), 'debit' => 0, 'credit' => $request->tax];
-                }
-
-                // Add discount line if applicable
-                if ($request->discount > 0) {
-                    $lines[] = ['account_id' => config('accounts.sales_discount', 6), 'debit' => $request->discount, 'credit' => 0];
-                }
-
-                $this->accountingService->createEntry(
-                    date: $sale->sale_date,
-                    description: "Sales Invoice #{$sale->id}",
-                    lines: $lines,
-                    referenceType: 'sale',
-                    referenceId: $sale->id
-                );
-
-                // 6️⃣ Load relationships for the response
-                $sale->load(['customer', 'items.product', 'user', 'warehouse']);
-
-                return response()->json([
-                    'message' => 'Sale created successfully',
-                    'id'      => $sale->id,
-                    'sale'    => new SaleResource($sale)
-                ], 201);
-            });
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to create sale: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-    
     /**
-     * Display the specified sale.
-     */
-    public function show(Sale $sale): SaleResource
+ * Store a newly created sale (Simplified for testing).
+ */
+public function store(StoreSaleRequest $request)
+{
+    try {
+        Log::info('Sale store started', $request->all());
+        
+        return DB::transaction(function () use ($request) {
+            $subtotalTotal = 0;
+            $totalCogs = 0;
+            
+            // Create Sale Header
+            $sale = Sale::create([
+                'customer_id'    => $request->customer_id,
+                'warehouse_id'   => $request->warehouse_id,
+                'created_by'     => Auth::id(),
+                'sale_date'      => $request->sale_date,
+                'payment_method' => $request->payment_method,
+                'payment_status' => $request->payment_status,
+                'discount'       => $request->discount ?? 0,
+                'tax'            => $request->tax ?? 0,
+                'total_amount'   => 0,
+                'total_cogs'     => 0,
+                'gross_profit'   => 0,
+            ]);
+            
+            Log::info('Sale created', ['sale_id' => $sale->id]);
+            
+            // Process Each Item
+            foreach ($request->items as $item) {
+                $costPrice = $item['cost_price'] ?? 100; // Temporary default
+                $quantity = $item['quantity'];
+                $sellingPrice = $item['selling_price'];
+                
+                $subtotal = $quantity * $sellingPrice;
+                $cogs = $quantity * $costPrice;
+                
+                $subtotalTotal += $subtotal;
+                $totalCogs += $cogs;
+                
+                SaleItem::create([
+                    'sale_id'       => $sale->id,
+                    'product_id'    => $item['product_id'],
+                    'quantity'      => $quantity,
+                    'selling_price' => $sellingPrice,
+                    'cost_price'    => $costPrice,
+                    'subtotal'      => $subtotal,
+                    'gross_profit'  => $subtotal - $cogs,
+                ]);
+            }
+            
+            // Calculate Final Total
+            $finalTotal = $subtotalTotal - ($request->discount ?? 0) + ($request->tax ?? 0);
+            
+            // Update Sale Header
+            $sale->update([
+                'total_amount' => $finalTotal,
+                'total_cogs'   => $totalCogs,
+                'gross_profit' => $subtotalTotal - $totalCogs,
+            ]);
+            
+            // Return simple response without relationships first
+            return response()->json([
+                'message' => 'Sale created successfully',
+                'id' => $sale->id,
+                'sale' => [
+                    'id' => $sale->id,
+                    'total_amount' => $finalTotal,
+                    'items_count' => count($request->items)
+                ]
+            ], 201);
+        });
+    } catch (\Exception $e) {
+        Log::error('Sale creation failed', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+        
+        return response()->json([
+            'message' => 'Failed to create sale: ' . $e->getMessage()
+        ], 500);
+    }
+}
+    
+   public function show(Sale $sale): SaleResource
     {
-        return new SaleResource(
-            $sale->load([
-                'customer',
-                'user',
-                'warehouse',
-                'items.product',
-                'returns.product',   
-                'returns.refund',
-                'returns.processedBy'
-            ])
-        );
+        // Load ALL needed relationships explicitly to prevent lazy loading
+        $sale->load([
+            'customer',
+            'user', 
+            'warehouse',
+            'items.product',
+            'returns.product',
+            'returns.refund',
+            'returns.processedBy'
+        ]);
+        
+        return new SaleResource($sale);
     }
 
     /**
      * Update the specified sale.
      */
-    public function update(UpdateSaleRequest $request, Sale $sale): SaleResource|JsonResponse
+    public function update(UpdateSaleRequest $request, Sale $sale): JsonResponse
     {
         try {
             $this->validateSaleModifiable($sale);
 
             return DB::transaction(function () use ($request, $sale) {
-                // 1️⃣ Delete existing journal entries for this sale
+                // Delete existing journal entries for this sale
                 $this->accountingService->deleteEntry('sale', $sale->id);
-
-                // 2️⃣ Restore stock from old items using COST PRICE
+                
+                // Restore stock from old items
                 foreach ($sale->items as $oldItem) {
                     $this->stockService->increaseStock(
                         $oldItem->product_id,
@@ -214,14 +175,14 @@ class SaleController extends Controller
                     );
                 }
 
-                // 3️⃣ Delete old items
+                // Delete old items
                 $sale->items()->delete();
 
                 $subtotalTotal = 0;
                 $totalCogs = 0;
                 $totalGrossProfit = 0;
 
-                // 4️⃣ Insert new items & decrease stock again
+                // Insert new items & decrease stock again
                 foreach ($request->items as $item) {
                     $costPrice = $this->stockService->getAverageCost(
                         $item['product_id'],
@@ -260,12 +221,12 @@ class SaleController extends Controller
                     );
                 }
 
-                // 5️⃣ Recalculate total
+                // Recalculate total
                 $finalTotal = $subtotalTotal
                     - ($request->discount ?? 0)
                     + ($request->tax ?? 0);
 
-                // 6️⃣ Update sale header
+                // Update sale header
                 $sale->update([
                     'customer_id'    => $request->customer_id,
                     'sale_date'      => $request->sale_date,
@@ -278,20 +239,44 @@ class SaleController extends Controller
                     'gross_profit'   => $totalGrossProfit,
                 ]);
 
-                // 7️⃣ Post new financial journal entry
+                // Post new financial journal entry
                 $lines = [
-                    ['account_id' => $this->getPaymentAccountId($request->payment_method), 'debit' => $finalTotal, 'credit' => 0],
-                    ['account_id' => config('accounts.sales_revenue', 2), 'debit' => 0, 'credit' => $subtotalTotal],
-                    ['account_id' => config('accounts.cogs', 3), 'debit' => $totalCogs, 'credit' => 0],
-                    ['account_id' => config('accounts.inventory', 4), 'debit' => 0, 'credit' => $totalCogs],
+                    [
+                        'account_id' => $this->getPaymentAccountId($request->payment_method), 
+                        'debit' => $finalTotal, 
+                        'credit' => 0
+                    ],
+                    [
+                        'account_id' => config('accounts.sales_revenue', 2), 
+                        'debit' => 0, 
+                        'credit' => $subtotalTotal
+                    ],
+                    [
+                        'account_id' => config('accounts.cogs', 3), 
+                        'debit' => $totalCogs, 
+                        'credit' => 0
+                    ],
+                    [
+                        'account_id' => config('accounts.inventory', 4), 
+                        'debit' => 0, 
+                        'credit' => $totalCogs
+                    ],
                 ];
 
                 if ($request->tax > 0) {
-                    $lines[] = ['account_id' => config('accounts.tax_payable', 5), 'debit' => 0, 'credit' => $request->tax];
+                    $lines[] = [
+                        'account_id' => config('accounts.tax_payable', 5), 
+                        'debit' => 0, 
+                        'credit' => $request->tax
+                    ];
                 }
 
                 if ($request->discount > 0) {
-                    $lines[] = ['account_id' => config('accounts.sales_discount', 6), 'debit' => $request->discount, 'credit' => 0];
+                    $lines[] = [
+                        'account_id' => config('accounts.sales_discount', 6), 
+                        'debit' => $request->discount, 
+                        'credit' => 0
+                    ];
                 }
 
                 $this->accountingService->createEntry(
@@ -302,9 +287,16 @@ class SaleController extends Controller
                     referenceId: $sale->id
                 );
 
-                return new SaleResource(
-                    $sale->load(['customer', 'items.product'])
-                );
+                // Load relationships for response
+                $sale->load(['customer', 'user', 'warehouse']);
+                $sale->load(['items' => function($query) {
+                    $query->with('product');
+                }]);
+
+                return response()->json([
+                    'message' => 'Sale updated successfully',
+                    'sale' => new SaleResource($sale)
+                ]);
             });
         } catch (\Exception $e) {
             return response()->json([
@@ -322,10 +314,10 @@ class SaleController extends Controller
             $this->validateSaleModifiable($sale);
 
             return DB::transaction(function () use ($sale) {
-                // 1️⃣ Delete journal entries
+                // Delete journal entries
                 $this->accountingService->deleteEntry('sale', $sale->id);
                 
-                // 2️⃣ Restore stock for all items using COST PRICE
+                // Restore stock for all items
                 foreach ($sale->items as $item) {
                     $this->stockService->increaseStock(
                         $item->product_id,
@@ -338,7 +330,7 @@ class SaleController extends Controller
                     );
                 }
 
-                // 3️⃣ Delete sale (cascade deletes items)
+                // Delete sale (cascade deletes items)
                 $sale->delete();
 
                 return response()->json([
@@ -377,7 +369,7 @@ class SaleController extends Controller
     /**
      * Process a return for a sale item.
      */
-    public function returnItem(Request $request, Sale $sale)
+    public function returnItem(Request $request, Sale $sale): JsonResponse
     {
         $request->validate([
             'product_id'     => 'required|exists:products,id',
@@ -412,11 +404,15 @@ class SaleController extends Controller
                     $message = 'Return submitted for approval';
                 }
 
-                $sale->load(['returns.product', 'returns.refund']);
+                // Load relationships carefully
+                $return->load(['product', 'processedBy']);
+                $sale->load(['returns' => function($query) {
+                    $query->with(['product', 'refund']);
+                }]);
 
                 return response()->json([
                     'message' => $message,
-                    'return'  => $return->load(['product', 'processedBy']),
+                    'return'  => $return,
                     'sale'    => new SaleResource($sale)
                 ]);
             });
@@ -457,7 +453,7 @@ class SaleController extends Controller
     /**
      * Approve a pending return.
      */
-    public function approveReturn(SaleReturn $return, $managerId = null)
+    protected function approveReturn(SaleReturn $return, $managerId = null): SaleReturn
     {
         return DB::transaction(function () use ($return, $managerId) {
             $approvedBy = $managerId ?? Auth::id();
@@ -484,16 +480,30 @@ class SaleController extends Controller
             $cogsAmount = $this->calculateReturnCogs($return);
             
             $lines = [
-                // Debit: Sales Returns/Allowances
-                ['account_id' => config('accounts.sales_returns', 9), 'debit' => $return->refund_amount, 'credit' => 0],
-                // Credit: Cash/Accounts Receivable
-                ['account_id' => $this->getPaymentAccountId($return->payment_method), 'debit' => 0, 'credit' => $return->refund_amount],
+                [
+                    'account_id' => config('accounts.sales_returns', 9), 
+                    'debit' => $return->refund_amount, 
+                    'credit' => 0
+                ],
+                [
+                    'account_id' => $this->getPaymentAccountId($return->payment_method), 
+                    'debit' => 0, 
+                    'credit' => $return->refund_amount
+                ],
             ];
 
             // Add inventory/COGS reversal if there's a cost
             if ($cogsAmount > 0) {
-                $lines[] = ['account_id' => config('accounts.inventory', 4), 'debit' => $cogsAmount, 'credit' => 0];
-                $lines[] = ['account_id' => config('accounts.cogs', 3), 'debit' => 0, 'credit' => $cogsAmount];
+                $lines[] = [
+                    'account_id' => config('accounts.inventory', 4), 
+                    'debit' => $cogsAmount, 
+                    'credit' => 0
+                ];
+                $lines[] = [
+                    'account_id' => config('accounts.cogs', 3), 
+                    'debit' => 0, 
+                    'credit' => $cogsAmount
+                ];
             }
 
             $this->accountingService->createEntry(
@@ -511,16 +521,18 @@ class SaleController extends Controller
     /**
      * API endpoint for approving returns.
      */
-    public function approve(SaleReturn $return)
+    public function approve(SaleReturn $return): JsonResponse
     {
         try {
             $this->authorize('approve', $return);
 
             $this->approveReturn($return);
 
+            $return->load(['product', 'refund']);
+
             return response()->json([
                 'message' => 'Return approved successfully',
-                'return' => $return->load(['product', 'refund'])
+                'return' => $return
             ]);
         } catch (\Exception $e) {
             return response()->json([

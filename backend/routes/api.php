@@ -170,7 +170,18 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::apiResource('customers', CustomerController::class);
     Route::apiResource('warehouses', WarehouseController::class);
+
+
+
 });
 
 
 
+    Route::get('/debug-sale', function() {
+    try {
+        $sale = new \App\Models\Sale();
+        return response()->json(['message' => 'Sale model works']);
+    } catch (\Exception $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+});

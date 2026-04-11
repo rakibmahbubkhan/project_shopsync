@@ -11,20 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('sale_items', function (Blueprint $table) {
-        $table->id();
-
-        $table->foreignId('sale_id')
-            ->constrained()
-            ->cascadeOnDelete();
-
-        $table->foreignId('product_id')
-            ->constrained()
-            ->cascadeOnDelete();
-
-        $table->integer('quantity');
-        $table->decimal('selling_price', 15, 2);
-        $table->decimal('subtotal', 15, 2);
+       Schema::create('sale_items', function (Blueprint $table) {
+    $table->id();
+    $table->foreignId('sale_id')->constrained()->onDelete('cascade');
+    $table->foreignId('product_id')->constrained();
+    $table->integer('quantity');
+    $table->decimal('selling_price', 10, 2);
+    $table->decimal('cost_price', 10, 2);
+    $table->decimal('subtotal', 10, 2);
+    $table->decimal('gross_profit', 10, 2);
+    $table->timestamps(); // Make sure this line exists
 });
 
     }

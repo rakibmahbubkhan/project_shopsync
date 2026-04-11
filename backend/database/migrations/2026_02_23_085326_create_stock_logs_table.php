@@ -44,10 +44,6 @@ return new class extends Migration
             $table->unique(['product_id', 'warehouse_id']);
         });
 
-        // Remove this separate Schema::table call since we've moved the unique constraint inside
-        // Schema::table('stock_logs', function (Blueprint $table) {
-        //     $table->unique(['product_id', 'warehouse_id']);
-        // });
     }
 
     /**
