@@ -21,7 +21,7 @@ return new class extends Migration
             $table->decimal('total_cogs', 15, 2)->default(0); // Changed to 2 decimal places
             $table->decimal('gross_profit', 15, 2)->default(0); // Changed to 2 decimal places
             $table->foreignId('created_by')->constrained('users')->restrictOnDelete(); // Changed to restrictOnDelete
-            $table->timestamp('created_at')->nullable();
+            $table->timestamp('created_at')->useCurrent(); // Sets current time on create
             $table->timestamp('updated_at')->nullable();
             
             // Add indexes for better performance

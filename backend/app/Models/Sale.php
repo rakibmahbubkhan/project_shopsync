@@ -54,6 +54,16 @@ class Sale extends Model
             $model->updated_at = $model->freshTimestamp();
         });
     }
+
+    public function setUpdatedAt($value)
+    {
+        // Only set the value if the record already exists (is an update)
+        if ($this->exists) {
+            $this->{static::UPDATED_AT} = $value;
+        }
+
+        return $this;
+    }
     
     // Rest of your relationships...
     public function customer(): BelongsTo
