@@ -15,6 +15,8 @@ class SaleItem extends Model
         'cost_price',
         'subtotal',
         'gross_profit',
+        'created_at',
+        'updated_at',
     ];
     
     protected $casts = [
@@ -23,7 +25,25 @@ class SaleItem extends Model
         'cost_price' => 'decimal:2',
         'subtotal' => 'decimal:2',
         'gross_profit' => 'decimal:2',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
+    
+    // Override the boot method to handle timestamps manually
+    protected static function boot()
+    {
+        parent::boot();
+        
+        static::creating(function ($model) {
+            $model->created_at = now();
+            // Don't set updated_at on creation
+            $model->updated_at = null;
+        });
+        
+        static::updating(function ($model) {
+            $model->updated_at = now();
+        });
+    }
     
     public function sale(): BelongsTo
     {

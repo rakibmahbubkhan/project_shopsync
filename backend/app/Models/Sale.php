@@ -33,7 +33,29 @@ class Sale extends Model
         'gross_profit' => 'decimal:2',
     ];
     
-    // Make sure these relationships exist and don't have circular references
+    /**
+     * Override the default timestamps behavior
+     */
+    public $timestamps = true;
+    
+    /**
+     * Set only created_at on insert, updated_at will be null
+     */
+    protected static function boot()
+    {
+        parent::boot();
+        
+        static::creating(function ($model) {
+            $model->created_at = $model->freshTimestamp();
+            $model->updated_at = null; // Explicitly set to null
+        });
+        
+        static::updating(function ($model) {
+            $model->updated_at = $model->freshTimestamp();
+        });
+    }
+    
+    // Rest of your relationships...
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
