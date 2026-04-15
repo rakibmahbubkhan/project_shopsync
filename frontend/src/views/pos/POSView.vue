@@ -281,6 +281,15 @@ const selectedWarehouse = ref(null);
 const paymentMethod = ref('cash');
 const loading = ref(false);
 
+
+let searchTimeout = null;
+const handleSearch = (query) => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    searchProducts(query);
+  }, 300); // Only search after the user stops typing for 300ms
+};
+
 // 1. Improved Search with standardized data access
 const searchProducts = async () => {
   if (!search.value || search.value.length < 2) {

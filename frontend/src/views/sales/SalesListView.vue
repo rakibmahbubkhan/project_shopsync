@@ -381,7 +381,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import api from '@/api/axios'
 import SaleDetailsModal from './SaleDetailsModal.vue'
 
@@ -397,6 +397,8 @@ const itemsPerPage = ref(10)
 
 let searchTimeout = null
 let abortController = null
+let isMounted = false
+let initialFetchDone = false
 
 // Computed - Filtered sales based on search (client-side for speed)
 const filteredSales = computed(() => {
@@ -523,7 +525,7 @@ const handleSearch = () => {
   currentPage.value = 1 // Reset to first page when searching
   if (searchTimeout) clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => {
-    // Search is handled by computed property
+    // Search is handled by computed property - no API call needed
   }, 300)
 }
 
@@ -552,15 +554,20 @@ const fetchSales = async (startDate = null) => {
       signal: abortController.signal 
     })
     
-    sales.value = response.data.data || []
-    currentPage.value = 1
+    // Only update if component is still mounted
+    if (isMounted) {
+      sales.value = response.data.data || []
+      currentPage.value = 1
+    }
   } catch (error) {
-    if (error.name !== 'AbortError') {
+    if (error.name !== 'AbortError' && isMounted) {
       console.error('Error fetching sales:', error)
       sales.value = []
     }
   } finally {
-    loading.value = false
+    if (isMounted) {
+      loading.value = false
+    }
     abortController = null
   }
 }
@@ -569,7 +576,9 @@ const fetchSales = async (startDate = null) => {
 const openSale = async (id) => {
   try {
     const response = await api.get(`/sales/${id}`)
-    selectedSale.value = response.data.data
+    if (isMounted) {
+      selectedSale.value = response.data.data
+    }
   } catch (error) {
     console.error('Error fetching sale details:', error)
     alert('Failed to load sale details')
@@ -614,7 +623,6 @@ const printInvoice = async (id) => {
 
 // Helper functions for loading indicator
 const showLoadingToast = (message) => {
-  // You can implement your own toast notification
   console.log(message)
   return setTimeout(() => {}, 1000)
 }
@@ -633,12 +641,29 @@ const changePage = (page) => {
 
 // Refresh data
 const refreshData = () => {
-  fetchSales()
+  if (!loading.value) {
+    fetchSales()
+  }
 }
 
-// Initial fetch
+// Initial fetch - only once
 onMounted(() => {
-  fetchSales()
+  isMounted = true
+  if (!initialFetchDone) {
+    initialFetchDone = true
+    fetchSales()
+  }
+})
+
+// Cleanup on unmount
+onUnmounted(() => {
+  isMounted = false
+  if (abortController) {
+    abortController.abort()
+  }
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+  }
 })
 </script>
 
