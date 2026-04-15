@@ -11,8 +11,11 @@ class SaleResource extends JsonResource
         // Base data - only direct attributes, no relationships
         $data = [
             'id' => $this->id,
+            'customer_name'  => $this->customer?->name ?? 'Walk-in Customer',
+            'customer_phone' => $this->customer?->phone,
             'customer_id' => $this->customer_id,
             'warehouse_id' => $this->warehouse_id,
+            'warehouse_name' => $this->warehouse?->name,
             'created_by' => $this->created_by,
             'sale_date' => $this->sale_date?->format('Y-m-d') ?? $this->sale_date,
             'payment_method' => $this->payment_method,
@@ -24,6 +27,14 @@ class SaleResource extends JsonResource
             'gross_profit' => (float) $this->gross_profit,
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
+            'items' => $this->whenLoaded('items', function() {
+                return $this->items->map(fn($item) => [
+                    'product_name'  => $item->product?->name,
+                    'quantity'      => $item->quantity,
+                    'selling_price' => (float) $item->selling_price,
+                    'subtotal'      => (float) $item->subtotal,
+                ]);
+            }),
         ];
 
         // Only add customer if loaded and exists

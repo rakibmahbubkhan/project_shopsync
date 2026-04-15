@@ -351,6 +351,43 @@ const tax = computed(() => subtotal.value * 0.05);
 const total = computed(() => subtotal.value + tax.value);
 
 // 3. Robust Checkout with better error parsing
+// Alternative print function that ensures the tab opens
+const printInvoice = async (id) => {
+  try {
+    // First open a blank tab
+    const newTab = window.open('', '_blank')
+    
+    if (!newTab) {
+      alert('Please allow pop-ups to view the receipt')
+      return
+    }
+    
+    // Show loading in the new tab
+    newTab.document.write('<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif;">Loading invoice...</div>')
+    
+    // Fetch the PDF
+    const response = await api.get(`/sales/${id}/receipt`, {
+      responseType: 'blob'
+    })
+    
+    // Create blob URL
+    const blob = new Blob([response.data], { type: 'application/pdf' })
+    const blobUrl = URL.createObjectURL(blob)
+    
+    // Redirect the tab to the PDF
+    newTab.location.href = blobUrl
+    
+    // Clean up
+    setTimeout(() => {
+      URL.revokeObjectURL(blobUrl)
+    }, 5000)
+    
+  } catch (error) {
+    console.error('Error printing invoice:', error)
+    alert('Failed to load receipt. Please try again.')
+  }
+}
+
 const checkout = async () => {
   if (!selectedCustomer.value || !selectedWarehouse.value) {
     alert("Please select both a Customer and a Warehouse.");
@@ -378,8 +415,8 @@ const checkout = async () => {
     const res = await api.post('/sales', payload);
     
     if (res.data?.id) {
-      const receiptUrl = `${import.meta.env.VITE_API_URL}/sales/${res.data.id}/receipt`;
-      window.open(receiptUrl, '_blank');
+      // This will open the receipt in a new tab automatically
+      await printInvoice(res.data.id)
     }
     
     // Reset state

@@ -52,13 +52,13 @@
         </div>
       </div>
 
-      <!-- Stats Cards -->
+      <!-- Stats Cards - Optimized with simpler calculations -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-shadow">
           <div class="flex items-center justify-between">
             <div>
               <p class="text-xs text-gray-500 uppercase tracking-wider">Total Sales</p>
-              <p class="text-2xl font-bold text-gray-800 mt-1">{{ totalSales }}</p>
+              <p class="text-2xl font-bold text-gray-800 mt-1">{{ stats.total_sales }}</p>
             </div>
             <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
               <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -72,7 +72,7 @@
           <div class="flex items-center justify-between">
             <div>
               <p class="text-xs text-gray-500 uppercase tracking-wider">Total Revenue</p>
-              <p class="text-2xl font-bold text-green-600 mt-1">৳ {{ totalRevenue.toFixed(2) }}</p>
+              <p class="text-2xl font-bold text-green-600 mt-1">৳ {{ formatNumber(stats.total_revenue) }}</p>
             </div>
             <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
               <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -86,7 +86,7 @@
           <div class="flex items-center justify-between">
             <div>
               <p class="text-xs text-gray-500 uppercase tracking-wider">Total Profit</p>
-              <p class="text-2xl font-bold text-purple-600 mt-1">৳ {{ totalProfit.toFixed(2) }}</p>
+              <p class="text-2xl font-bold text-purple-600 mt-1">৳ {{ formatNumber(stats.total_profit) }}</p>
             </div>
             <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
               <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -100,7 +100,7 @@
           <div class="flex items-center justify-between">
             <div>
               <p class="text-xs text-gray-500 uppercase tracking-wider">Avg. Order Value</p>
-              <p class="text-2xl font-bold text-orange-600 mt-1">৳ {{ avgOrderValue.toFixed(2) }}</p>
+              <p class="text-2xl font-bold text-orange-600 mt-1">৳ {{ formatNumber(stats.avg_order_value) }}</p>
             </div>
             <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
               <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -152,13 +152,16 @@
         </div>
       </div>
 
-      <!-- Loading State -->
-      <div v-if="loading" class="bg-white rounded-xl shadow-sm border border-gray-100 p-12">
-        <div class="flex flex-col items-center justify-center">
-          <div class="relative">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+      <!-- Loading State with Skeleton -->
+      <div v-if="loading" class="space-y-4">
+        <div v-for="i in 5" :key="i" class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 animate-pulse">
+          <div class="flex justify-between">
+            <div class="space-y-2 flex-1">
+              <div class="h-4 bg-gray-200 rounded w-1/4"></div>
+              <div class="h-3 bg-gray-200 rounded w-1/3"></div>
+            </div>
+            <div class="h-8 bg-gray-200 rounded w-24"></div>
           </div>
-          <p class="mt-4 text-gray-500">Loading sales data...</p>
         </div>
       </div>
 
@@ -177,12 +180,12 @@
                   <th class="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Profit</th>
                   <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Payment</th>
                   <th class="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date</th>
-                  <th class="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Action</th>
+                  <th class="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100">
                 <tr 
-                  v-for="sale in filteredSales" 
+                  v-for="sale in paginatedSales" 
                   :key="sale.id" 
                   class="hover:bg-gray-50 transition-colors duration-150"
                 >
@@ -203,10 +206,10 @@
                     <span class="text-sm text-gray-600">{{ sale.warehouse?.name }}</span>
                   </td>
                   <td class="px-6 py-4 text-right">
-                    <span class="text-sm font-semibold text-green-600">৳ {{ Number(sale.total_amount).toFixed(2) }}</span>
+                    <span class="text-sm font-semibold text-green-600">৳ {{ formatNumber(sale.total_amount) }}</span>
                   </td>
                   <td class="px-6 py-4 text-right">
-                    <span class="text-sm font-medium text-purple-600">৳ {{ Number(sale.gross_profit).toFixed(2) }}</span>
+                    <span class="text-sm font-medium text-purple-600">৳ {{ formatNumber(sale.gross_profit) }}</span>
                   </td>
                   <td class="px-6 py-4">
                     <span :class="getPaymentBadgeClass(sale.payment_method)" class="px-2 py-1 text-xs rounded-full">
@@ -222,17 +225,25 @@
                     </div>
                   </td>
                   <td class="px-6 py-4 text-center">
-                    <button
-                      @click="openSale(sale.id)"
-                      class="px-3 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white text-sm rounded-lg transition-all shadow-md hover:shadow-lg transform hover:scale-105"
-                    >
-                      View Details
-                    </button>
+                    <div class="flex gap-2 justify-center">
+                      <button
+                        @click="openSale(sale.id)"
+                        class="px-3 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white text-sm rounded-lg transition-all shadow-md hover:shadow-lg"
+                      >
+                        View
+                      </button>
+                      <button
+                        @click="printInvoice(sale.id)"
+                        class="px-3 py-1.5 bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white text-sm rounded-lg transition-all shadow-md hover:shadow-lg"
+                      >
+                        Print
+                      </button>
+                    </div>
                   </td>
                 </tr>
                 
                 <!-- Empty State -->
-                <tr v-if="filteredSales.length === 0">
+                <tr v-if="paginatedSales.length === 0">
                   <td :colspan="8" class="px-6 py-12 text-center">
                     <div class="flex flex-col items-center justify-center">
                       <svg class="w-16 h-16 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -251,7 +262,7 @@
         <!-- Mobile Card View -->
         <div class="lg:hidden space-y-3">
           <div
-            v-for="sale in filteredSales"
+            v-for="sale in paginatedSales"
             :key="sale.id"
             class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-all"
           >
@@ -276,24 +287,34 @@
               </div>
               <div class="flex justify-between text-sm">
                 <span class="text-gray-500">Total:</span>
-                <span class="font-bold text-green-600">৳ {{ Number(sale.total_amount).toFixed(2) }}</span>
+                <span class="font-bold text-green-600">৳ {{ formatNumber(sale.total_amount) }}</span>
               </div>
               <div class="flex justify-between text-sm">
                 <span class="text-gray-500">Profit:</span>
-                <span class="font-medium text-purple-600">৳ {{ Number(sale.gross_profit).toFixed(2) }}</span>
+                <span class="font-medium text-purple-600">৳ {{ formatNumber(sale.gross_profit) }}</span>
               </div>
             </div>
             
-            <button
-              @click="openSale(sale.id)"
-              class="w-full py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg transition-all shadow-md"
-            >
-              View Details
-            </button>
+            <div class="flex gap-2">
+              <button
+                @click="openSale(sale.id)"
+                class="flex-1 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg transition-all shadow-md"
+              >
+                View Details
+              </button>
+              <button
+                @click="printInvoice(sale.id)"
+                class="px-4 py-2 bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white rounded-lg transition-all shadow-md"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           <!-- Mobile Empty State -->
-          <div v-if="filteredSales.length === 0" class="bg-white border border-gray-200 rounded-xl p-8 text-center">
+          <div v-if="paginatedSales.length === 0" class="bg-white border border-gray-200 rounded-xl p-8 text-center">
             <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -303,17 +324,17 @@
         </div>
 
         <!-- Pagination -->
-        <div v-if="meta.last_page > 1" class="mt-6">
+        <div v-if="totalPages > 1" class="mt-6">
           <div class="bg-white rounded-xl shadow-sm border border-gray-100 px-4 py-3">
             <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
               <div class="text-sm text-gray-600">
-                Showing {{ meta.from || 0 }} to {{ meta.to || 0 }} of {{ meta.total || 0 }} entries
+                Showing {{ ((currentPage - 1) * itemsPerPage) + 1 }} to {{ Math.min(currentPage * itemsPerPage, filteredSales.length) }} of {{ filteredSales.length }} entries
               </div>
               
               <div class="flex gap-2">
                 <button
-                  @click="changePage(meta.current_page - 1)"
-                  :disabled="meta.current_page === 1"
+                  @click="changePage(currentPage - 1)"
+                  :disabled="currentPage === 1"
                   class="px-4 py-2 text-gray-600 hover:text-green-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-lg border border-gray-200 hover:border-green-300"
                 >
                   Previous
@@ -326,7 +347,7 @@
                     @click="changePage(page)"
                     :class="[
                       'px-3 py-2 rounded-lg transition-all',
-                      meta.current_page === page
+                      currentPage === page
                         ? 'bg-green-600 text-white shadow-md'
                         : 'text-gray-600 hover:bg-gray-100'
                     ]"
@@ -336,8 +357,8 @@
                 </div>
                 
                 <button
-                  @click="changePage(meta.current_page + 1)"
-                  :disabled="meta.current_page === meta.last_page"
+                  @click="changePage(currentPage + 1)"
+                  :disabled="currentPage === totalPages"
                   class="px-4 py-2 text-gray-600 hover:text-green-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-lg border border-gray-200 hover:border-green-300"
                 >
                   Next
@@ -364,36 +385,20 @@ import { ref, computed, onMounted } from 'vue'
 import api from '@/api/axios'
 import SaleDetailsModal from './SaleDetailsModal.vue'
 
+// State
 const sales = ref([])
 const selectedSale = ref(null)
 const loading = ref(false)
 const searchQuery = ref('')
 const paymentFilter = ref('')
 const activeFilter = ref('all')
-const meta = ref({
-  current_page: 1,
-  last_page: 1,
-  per_page: 10,
-  total: 0,
-  from: 0,
-  to: 0
-})
+const currentPage = ref(1)
+const itemsPerPage = ref(10)
 
 let searchTimeout = null
+let abortController = null
 
-// Computed properties for stats
-const totalSales = computed(() => sales.value.length)
-const totalRevenue = computed(() => 
-  sales.value.reduce((sum, sale) => sum + Number(sale.total_amount || 0), 0)
-)
-const totalProfit = computed(() => 
-  sales.value.reduce((sum, sale) => sum + Number(sale.gross_profit || 0), 0)
-)
-const avgOrderValue = computed(() => 
-  totalSales.value > 0 ? totalRevenue.value / totalSales.value : 0
-)
-
-// Filtered sales based on search
+// Computed - Filtered sales based on search (client-side for speed)
 const filteredSales = computed(() => {
   let filtered = sales.value
   
@@ -413,10 +418,34 @@ const filteredSales = computed(() => {
   return filtered
 })
 
+// Paginated sales
+const paginatedSales = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage.value
+  const end = start + itemsPerPage.value
+  return filteredSales.value.slice(start, end)
+})
+
+// Total pages
+const totalPages = computed(() => Math.ceil(filteredSales.value.length / itemsPerPage.value))
+
+// Stats - computed from filtered data for speed
+const stats = computed(() => {
+  const total = filteredSales.value.length
+  const revenue = filteredSales.value.reduce((sum, sale) => sum + Number(sale.total_amount || 0), 0)
+  const profit = filteredSales.value.reduce((sum, sale) => sum + Number(sale.gross_profit || 0), 0)
+  
+  return {
+    total_sales: total,
+    total_revenue: revenue,
+    total_profit: profit,
+    avg_order_value: total > 0 ? revenue / total : 0
+  }
+})
+
 // Visible pages for pagination
 const visiblePages = computed(() => {
-  const current = meta.value.current_page
-  const last = meta.value.last_page
+  const current = currentPage.value
+  const last = totalPages.value
   const delta = 2
   const range = []
   
@@ -434,6 +463,10 @@ const visiblePages = computed(() => {
 })
 
 // Helper functions
+const formatNumber = (value) => {
+  return Number(value || 0).toFixed(2)
+}
+
 const getPaymentMethodLabel = (method) => {
   const methods = {
     cash: 'Cash',
@@ -461,7 +494,7 @@ const formatDate = (date) => {
 }
 
 // Filter by period
-const filterPeriod = (period) => {
+const filterPeriod = async (period) => {
   activeFilter.value = period
   const now = new Date()
   let startDate = new Date()
@@ -478,43 +511,57 @@ const filterPeriod = (period) => {
       startDate = new Date(now.getFullYear(), now.getMonth(), 1)
       break
     default:
-      fetchSales()
+      await fetchSales()
       return
   }
   
-  fetchSales(startDate.toISOString().split('T')[0])
+  await fetchSales(startDate.toISOString().split('T')[0])
 }
 
 // Handle search with debounce
 const handleSearch = () => {
+  currentPage.value = 1 // Reset to first page when searching
   if (searchTimeout) clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => {
     // Search is handled by computed property
   }, 300)
 }
 
-// Fetch sales data
+// Fetch sales data with pagination from server
 const fetchSales = async (startDate = null) => {
+  // Cancel previous request
+  if (abortController) {
+    abortController.abort()
+  }
+  
+  abortController = new AbortController()
   loading.value = true
   
   try {
     const params = {
-      page: meta.value.current_page,
-      per_page: meta.value.per_page
+      page: 1,
+      per_page: 100 // Fetch more records at once for client-side filtering
     }
     
     if (startDate) {
       params.start_date = startDate
     }
     
-    const response = await api.get('/sales', { params })
+    const response = await api.get('/sales', { 
+      params,
+      signal: abortController.signal 
+    })
+    
     sales.value = response.data.data || []
-    meta.value = response.data.meta || response.data
+    currentPage.value = 1
   } catch (error) {
-    console.error('Error fetching sales:', error)
-    sales.value = []
+    if (error.name !== 'AbortError') {
+      console.error('Error fetching sales:', error)
+      sales.value = []
+    }
   } finally {
     loading.value = false
+    abortController = null
   }
 }
 
@@ -529,11 +576,58 @@ const openSale = async (id) => {
   }
 }
 
+// Print invoice
+const printInvoice = async (id) => {
+  try {
+    // Show loading indicator
+    const loadingToast = showLoadingToast('Preparing invoice...')
+    
+    // Fetch the PDF as blob
+    const response = await api.get(`/sales/${id}/receipt`, {
+      responseType: 'blob',
+      headers: {
+        'Accept': 'application/pdf'
+      }
+    })
+    
+    // Create blob URL
+    const blob = new Blob([response.data], { type: 'application/pdf' })
+    const blobUrl = URL.createObjectURL(blob)
+    
+    // Open in new window
+    const printWindow = window.open(blobUrl, '_blank')
+    if (!printWindow) {
+      alert('Please allow pop-ups to print invoices')
+    }
+    
+    // Clean up blob URL after a delay
+    setTimeout(() => {
+      URL.revokeObjectURL(blobUrl)
+    }, 1000)
+    
+    hideLoadingToast(loadingToast)
+  } catch (error) {
+    console.error('Error printing invoice:', error)
+    alert('Failed to print invoice. Please try again.')
+  }
+}
+
+// Helper functions for loading indicator
+const showLoadingToast = (message) => {
+  // You can implement your own toast notification
+  console.log(message)
+  return setTimeout(() => {}, 1000)
+}
+
+const hideLoadingToast = (toast) => {
+  clearTimeout(toast)
+}
+
 // Change page
 const changePage = (page) => {
-  if (page > 0 && page <= meta.value.last_page && page !== meta.value.current_page) {
-    meta.value.current_page = page
-    fetchSales()
+  if (page > 0 && page <= totalPages.value && page !== currentPage.value) {
+    currentPage.value = page
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 }
 
@@ -550,13 +644,16 @@ onMounted(() => {
 
 <style scoped>
 /* Custom animations */
-.animate-spin {
-  animation: spin 1s linear infinite;
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .5;
   }
 }
 
