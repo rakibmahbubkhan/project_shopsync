@@ -96,11 +96,12 @@
             <span v-else class="tooltip">Sales History</span>
           </router-link>
 
-          <router-link to="/purchases/create" class="nav-item group" active-class="active" :class="{ 'justify-center': isCollapsed }">
-            <span class="icon">📦</span>
-            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm">New Purchase</span>
-            <span v-else class="tooltip">New Purchase</span>
-          </router-link>
+                  <!-- Add this under Operations section -->
+        <router-link to="/purchases" class="nav-item group" active-class="active" :class="{ 'justify-center': isCollapsed }">
+          <span class="icon">📋</span>
+          <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm">Purchase List</span>
+          <span v-else class="tooltip">Purchase List</span>
+        </router-link>
 
           <router-link to="/inventory/transfer" class="nav-item group" active-class="active" :class="{ 'justify-center': isCollapsed }">
             <span class="icon">🚚</span>
