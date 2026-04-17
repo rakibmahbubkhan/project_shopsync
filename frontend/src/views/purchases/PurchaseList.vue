@@ -128,10 +128,10 @@
                 </td>
                 <td class="px-4 py-4 text-gray-600">{{ formatDate(purchase.purchase_date) }}</td>
                 <td class="px-4 py-4">
-                  <div class="font-medium text-gray-800">{{ purchase.supplier?.name || getSupplierNameFromId(purchase.supplier_id) }}</div>
+                  <div class="font-medium text-gray-800">{{ purchase.supplier?.name }}</div>
                   <div class="text-xs text-gray-400">{{ purchase.supplier?.phone }}</div>
                 </td>
-                <td class="px-4 py-4 text-gray-600">{{ purchase.warehouse?.name || getWarehouseNameFromId(purchase.warehouse_id) }}</td>
+                <td class="px-4 py-4 text-gray-600">{{ purchase.warehouse?.name }}</td>
                 <td class="px-4 py-4 text-right">
                   <span class="font-semibold text-gray-800">৳{{ formatNumber(purchase.total_amount) }}</span>
                 </td>
@@ -153,11 +153,11 @@
                 </td>
                 <td class="px-4 py-4 text-center">
                   <div class="flex items-center justify-center gap-2">
-                    <button @click="openEditModal(purchase)" class="text-blue-500 hover:text-blue-700 transition-colors p-1" title="Edit Purchase">
+                    <router-link :to="`/purchases/${purchase.id}/edit`" class="text-blue-500 hover:text-blue-700 transition-colors p-1" title="Edit Purchase">
                       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
-                    </button>
+                    </router-link>
                     
                     <button @click="printPurchase(purchase)" class="text-gray-500 hover:text-gray-700 transition-colors p-1" title="Print Purchase">
                       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -180,6 +180,7 @@
                 </td>
               </tr>
               
+              <!-- Empty State -->
               <tr v-if="purchases.length === 0 && !loading">
                 <td colspan="9" class="px-4 py-12 text-center">
                   <div class="flex flex-col items-center justify-center">
@@ -228,225 +229,6 @@
       </div>
     </div>
 
-    <!-- Edit Purchase Modal -->
-    <div v-if="showEditModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="closeEditModal">
-      <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-          <div>
-            <h2 class="text-xl font-bold text-gray-800">Edit Purchase Order</h2>
-            <p class="text-sm text-gray-500">Reference: {{ editingPurchase?.reference_no }}</p>
-          </div>
-          <button @click="closeEditModal" class="text-gray-400 hover:text-gray-600">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div class="p-6">
-          <form @submit.prevent="updatePurchase">
-            <!-- Basic Info -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <div>
-                <label class="text-sm font-semibold text-gray-700 block mb-2">Supplier *</label>
-                <div class="text-gray-800 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
-                  {{ getSupplierDisplayName() }}
-                </div>
-              </div>
-              <div>
-                <label class="text-sm font-semibold text-gray-700 block mb-2">Warehouse *</label>
-                <div class="text-gray-800 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
-                  {{ getWarehouseDisplayName() }}
-                </div>
-              </div>
-              <div>
-                <label class="text-sm font-semibold text-gray-700 block mb-2">Purchase Date</label>
-                <div class="text-gray-800 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
-                  {{ formatDate(editForm.purchase_date) }}
-                </div>
-              </div>
-              <div>
-                <label class="text-sm font-semibold text-gray-700 block mb-2">Status</label>
-                <select v-model="editForm.status" class="w-full px-3 py-2 border-2 border-gray-200 rounded-xl focus:border-purple-300 outline-none" :disabled="editForm.status === 'received'">
-                  <option value="ordered">Ordered</option>
-                  <option value="received">Received</option>
-                  <option value="pending">Pending</option>
-                </select>
-              </div>
-            </div>
-
-            <!-- Items Table -->
-            <div class="mb-6">
-              <h3 class="font-semibold text-gray-800 mb-3">Items</h3>
-              <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                  <thead class="bg-gray-50">
-                    <tr>
-                      <th class="px-3 py-2 text-left">Product</th>
-                      <th class="px-3 py-2 text-right">Quantity</th>
-                      <th class="px-3 py-2 text-right">Unit Cost</th>
-                      <th class="px-3 py-2 text-right">Discount %</th>
-                      <th class="px-3 py-2 text-right">Tax %</th>
-                      <th class="px-3 py-2 text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="(item, index) in editForm.items" :key="index">
-                      <td class="px-3 py-2">
-                        <div class="font-medium text-gray-800">{{ item.product?.name || 'Product not found' }}</div>
-                      </td>
-                      <td class="px-3 py-2 text-right">
-                        <div class="text-gray-700">{{ formatNumber(item.quantity) }}</div>
-                      </td>
-                      <td class="px-3 py-2 text-right">
-                        <div class="text-gray-700">৳{{ formatNumber(item.purchase_price) }}</div>
-                      </td>
-                      <td class="px-3 py-2 text-right">
-                        <div class="text-gray-700">{{ formatNumber(item.discount) }}%</div>
-                      </td>
-                      <td class="px-3 py-2 text-right">
-                        <div class="text-gray-700">{{ formatNumber(item.tax) }}%</div>
-                      </td>
-                      <td class="px-3 py-2 text-right font-semibold">
-                        <div class="text-purple-600">৳{{ formatNumber(item.total) }}</div>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <!-- Totals -->
-            <div class="bg-gray-50 rounded-xl p-4 mb-6">
-              <div class="flex justify-between mb-2">
-                <span>Subtotal:</span>
-                <span>৳{{ formatNumber(editSubtotal) }}</span>
-              </div>
-              <div class="flex justify-between mb-2">
-                <span>Total Discount:</span>
-                <span class="text-red-600">- ৳{{ formatNumber(editTotalDiscount) }}</span>
-              </div>
-              <div class="flex justify-between mb-2">
-                <span>Total Tax:</span>
-                <span class="text-green-600">+ ৳{{ formatNumber(editTotalTax) }}</span>
-              </div>
-              <div class="flex justify-between pt-2 border-t border-gray-200 font-bold">
-                <span>Total Amount:</span>
-                <span class="text-purple-600">৳{{ formatNumber(editTotalAmount) }}</span>
-              </div>
-            </div>
-
-            <!-- Payment Info -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <div>
-                <label class="text-sm font-semibold text-gray-700 block mb-2">Payment Status</label>
-                <div class="text-gray-800 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
-                  {{ getPaymentStatusLabel(editForm.payment_status) }}
-                </div>
-              </div>
-              <div>
-                <label class="text-sm font-semibold text-gray-700 block mb-2">Paid Amount</label>
-                <input 
-                  type="number" 
-                  v-model="editForm.paid_amount" 
-                  step="0.01" 
-                  class="w-full px-3 py-2 border-2 border-gray-200 rounded-xl focus:border-purple-300 outline-none"
-                  :max="editTotalAmount"
-                  :readonly="editForm.payment_status === 'paid'"
-                  :class="{'bg-gray-100': editForm.payment_status === 'paid'}"
-                >
-                <p v-if="editForm.payment_status !== 'paid'" class="text-xs text-gray-500 mt-1">
-                  Due amount: ৳{{ formatNumber(editTotalAmount - editForm.paid_amount) }}
-                </p>
-              </div>
-            </div>
-
-            <!-- Add Payment Button -->
-            <div v-if="editForm.payment_status !== 'paid' && editForm.paid_amount < editTotalAmount" class="mb-6">
-              <button 
-                type="button" 
-                @click="showAddPaymentModal = true"
-                class="text-purple-600 hover:text-purple-700 font-medium flex items-center gap-2"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                </svg>
-                Add Additional Payment
-              </button>
-            </div>
-
-            <!-- Form Actions -->
-            <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
-              <button type="button" @click="closeEditModal" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-all">
-                Cancel
-              </button>
-              <button type="submit" :disabled="editLoading" class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all disabled:opacity-50">
-                <span v-if="!editLoading">Update Payment</span>
-                <span v-else class="flex items-center gap-2">
-                  <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Updating...
-                </span>
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-
-    <!-- Add Payment Modal -->
-    <div v-if="showAddPaymentModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="showAddPaymentModal = false">
-      <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-        <div class="border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-          <h2 class="text-xl font-bold text-gray-800">Add Payment</h2>
-          <button @click="showAddPaymentModal = false" class="text-gray-400 hover:text-gray-600">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div class="p-6">
-          <div class="mb-4">
-            <label class="text-sm font-semibold text-gray-700 block mb-2">Payment Amount</label>
-            <div class="relative">
-              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">৳</span>
-              <input 
-                type="number" 
-                v-model="paymentAmount" 
-                step="0.01"
-                :max="editTotalAmount - editForm.paid_amount"
-                class="w-full pl-8 pr-3 py-2 border-2 border-gray-200 rounded-xl focus:border-purple-300 outline-none"
-              >
-            </div>
-            <p class="text-xs text-gray-500 mt-1">Maximum: ৳{{ formatNumber(editTotalAmount - editForm.paid_amount) }}</p>
-          </div>
-          <div class="mb-4">
-            <label class="text-sm font-semibold text-gray-700 block mb-2">Payment Date</label>
-            <input type="date" v-model="paymentDate" class="w-full px-3 py-2 border-2 border-gray-200 rounded-xl focus:border-purple-300 outline-none">
-          </div>
-          <div class="mb-4">
-            <label class="text-sm font-semibold text-gray-700 block mb-2">Payment Method</label>
-            <select v-model="paymentMethod" class="w-full px-3 py-2 border-2 border-gray-200 rounded-xl focus:border-purple-300 outline-none">
-              <option value="cash">Cash</option>
-              <option value="bank_transfer">Bank Transfer</option>
-              <option value="check">Check</option>
-              <option value="mobile_banking">Mobile Banking</option>
-            </select>
-          </div>
-          <div class="flex justify-end gap-3">
-            <button @click="showAddPaymentModal = false" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-all">
-              Cancel
-            </button>
-            <button @click="addPayment" :disabled="!paymentAmount || paymentAmount <= 0" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all disabled:opacity-50">
-              Add Payment
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- Loading Overlay -->
     <div v-if="loading" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
       <div class="bg-white p-8 rounded-2xl shadow-2xl text-center">
@@ -458,7 +240,7 @@
 </template>
 
 <script>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/api/axios'
 
@@ -470,19 +252,9 @@ export default {
     
     // State
     const loading = ref(false)
-    const editLoading = ref(false)
-    const showEditModal = ref(false)
-    const showAddPaymentModal = ref(false)
-    const editingPurchase = ref(null)
     const purchases = ref([])
     const suppliers = ref([])
-    const warehouses = ref([])
     let searchTimeout = null
-    
-    // Payment modal data
-    const paymentAmount = ref(0)
-    const paymentDate = ref(new Date().toISOString().split('T')[0])
-    const paymentMethod = ref('cash')
     
     // Filters
     const filters = reactive({
@@ -502,79 +274,6 @@ export default {
       last_page: 1,
       next_page_url: null,
       prev_page_url: null
-    })
-    
-    // Edit Form
-    const editForm = reactive({
-      supplier_id: '',
-      warehouse_id: '',
-      purchase_date: '',
-      status: '',
-      payment_status: '',
-      paid_amount: 0,
-      items: []
-    })
-    
-    // Helper functions to get names from IDs
-    const getSupplierNameFromId = (id) => {
-      if (!id) return 'N/A'
-      const supplier = suppliers.value.find(s => s.id === id)
-      return supplier?.name || 'N/A'
-    }
-    
-    const getWarehouseNameFromId = (id) => {
-      if (!id) return 'N/A'
-      const warehouse = warehouses.value.find(w => w.id === id)
-      return warehouse?.name || 'N/A'
-    }
-    
-    const getSupplierDisplayName = () => {
-      if (!editForm.supplier_id) return 'N/A'
-      // First try to find in suppliers array
-      const supplier = suppliers.value.find(s => s.id === editForm.supplier_id)
-      if (supplier?.name) return supplier.name
-      // If not found, try to get from editingPurchase
-      if (editingPurchase.value?.supplier?.name) return editingPurchase.value.supplier.name
-      return 'Loading...'
-    }
-    
-    const getWarehouseDisplayName = () => {
-      if (!editForm.warehouse_id) return 'N/A'
-      // First try to find in warehouses array
-      const warehouse = warehouses.value.find(w => w.id === editForm.warehouse_id)
-      if (warehouse?.name) return warehouse.name
-      // If not found, try to get from editingPurchase
-      if (editingPurchase.value?.warehouse?.name) return editingPurchase.value.warehouse.name
-      return 'Loading...'
-    }
-    
-    // Computed for edit totals
-    const editSubtotal = computed(() => {
-      return editForm.items.reduce((sum, item) => {
-        return sum + (parseFloat(item.quantity || 0) * parseFloat(item.purchase_price || 0))
-      }, 0)
-    })
-    
-    const editTotalDiscount = computed(() => {
-      return editForm.items.reduce((sum, item) => {
-        const itemSubtotal = parseFloat(item.quantity || 0) * parseFloat(item.purchase_price || 0)
-        const discountAmount = (itemSubtotal * (parseFloat(item.discount) || 0)) / 100
-        return sum + discountAmount
-      }, 0)
-    })
-    
-    const editTotalTax = computed(() => {
-      return editForm.items.reduce((sum, item) => {
-        const itemSubtotal = parseFloat(item.quantity || 0) * parseFloat(item.purchase_price || 0)
-        const discountAmount = (itemSubtotal * (parseFloat(item.discount) || 0)) / 100
-        const taxableAmount = itemSubtotal - discountAmount
-        const taxAmount = (taxableAmount * (parseFloat(item.tax) || 0)) / 100
-        return sum + taxAmount
-      }, 0)
-    })
-    
-    const editTotalAmount = computed(() => {
-      return editSubtotal.value - editTotalDiscount.value + editTotalTax.value
     })
     
     // Methods
@@ -655,19 +354,8 @@ export default {
       try {
         const response = await api.get('/suppliers')
         suppliers.value = response.data.data || response.data
-        console.log('Suppliers loaded:', suppliers.value)
       } catch (error) {
         console.error('Failed to load suppliers:', error)
-      }
-    }
-    
-    const loadWarehouses = async () => {
-      try {
-        const response = await api.get('/warehouses')
-        warehouses.value = response.data.data || response.data
-        console.log('Warehouses loaded:', warehouses.value)
-      } catch (error) {
-        console.error('Failed to load warehouses:', error)
       }
     }
     
@@ -697,122 +385,6 @@ export default {
       if (page < 1 || page > pagination.last_page) return
       pagination.current_page = page
       loadPurchases()
-    }
-    
-    const openEditModal = async (purchase) => {
-      editingPurchase.value = purchase
-      try {
-        const response = await api.get(`/purchases/${purchase.id}`)
-        const fullPurchase = response.data.data
-        
-        editForm.supplier_id = fullPurchase.supplier_id
-        editForm.warehouse_id = fullPurchase.warehouse_id
-        editForm.purchase_date = fullPurchase.purchase_date
-        editForm.status = fullPurchase.status
-        editForm.payment_status = fullPurchase.payment_status
-        editForm.paid_amount = parseFloat(fullPurchase.paid_amount) || 0
-        editForm.items = fullPurchase.items.map(item => ({
-          id: item.id,
-          product_id: item.product_id,
-          product: item.product,
-          quantity: parseFloat(item.quantity),
-          purchase_price: parseFloat(item.purchase_price),
-          discount: parseFloat(item.discount || 0),
-          tax: parseFloat(item.tax || 0),
-          total: parseFloat(item.total)
-        }))
-        
-        console.log('Edit form data:', {
-          supplier_id: editForm.supplier_id,
-          warehouse_id: editForm.warehouse_id,
-          supplier_name: getSupplierDisplayName(),
-          warehouse_name: getWarehouseDisplayName()
-        })
-        
-        showEditModal.value = true
-      } catch (error) {
-        console.error('Failed to load purchase details:', error)
-        alert('Failed to load purchase details')
-      }
-    }
-    
-    const closeEditModal = () => {
-      showEditModal.value = false
-      showAddPaymentModal.value = false
-      editingPurchase.value = null
-      editForm.items = []
-      paymentAmount.value = 0
-      paymentDate.value = new Date().toISOString().split('T')[0]
-      paymentMethod.value = 'cash'
-    }
-    
-    const addPayment = async () => {
-      if (!paymentAmount.value || paymentAmount.value <= 0) {
-        alert('Please enter a valid payment amount')
-        return
-      }
-      
-      const maxAmount = editTotalAmount.value - editForm.paid_amount
-      if (paymentAmount.value > maxAmount) {
-        alert(`Payment amount cannot exceed ${formatNumber(maxAmount)}`)
-        return
-      }
-      
-      editLoading.value = true
-      try {
-        await api.post(`/purchases/${editingPurchase.value.id}/payments`, {
-          amount: parseFloat(paymentAmount.value),
-          payment_date: paymentDate.value,
-          payment_method: paymentMethod.value
-        })
-        
-        const newPaidAmount = editForm.paid_amount + parseFloat(paymentAmount.value)
-        editForm.paid_amount = newPaidAmount
-        
-        if (newPaidAmount >= editTotalAmount.value) {
-          editForm.payment_status = 'paid'
-        } else if (newPaidAmount > 0) {
-          editForm.payment_status = 'partial'
-        }
-        
-        alert('Payment added successfully!')
-        showAddPaymentModal.value = false
-        paymentAmount.value = 0
-        await loadPurchases()
-      } catch (error) {
-        console.error('Add payment failed:', error)
-        alert('Failed to add payment: ' + (error.response?.data?.message || error.message))
-      } finally {
-        editLoading.value = false
-      }
-    }
-    
-    const updatePurchase = async () => {
-      if (!editingPurchase.value) return
-      
-      editLoading.value = true
-      try {
-        if (editForm.payment_status === 'paid') {
-          editForm.paid_amount = editTotalAmount.value
-        }
-        
-        const payload = {
-          paid_amount: parseFloat(editForm.paid_amount) || 0,
-          payment_status: editForm.payment_status,
-          status: editForm.status
-        }
-        
-        await api.put(`/purchases/${editingPurchase.value.id}`, payload)
-        
-        alert('Purchase updated successfully!')
-        closeEditModal()
-        loadPurchases()
-      } catch (error) {
-        console.error('Update failed:', error)
-        alert('Failed to update purchase: ' + (error.response?.data?.message || error.message))
-      } finally {
-        editLoading.value = false
-      }
     }
     
     const receivePurchase = async (purchase) => {
@@ -868,11 +440,11 @@ export default {
           </div>
           <div class="purchase-info">
             <div class="info-row"><span><strong>PO Number:</strong> ${purchase.reference_no}</span><span><strong>Date:</strong> ${formatDate(purchase.purchase_date)}</span></div>
-            <div class="info-row"><span><strong>Supplier:</strong> ${purchase.supplier?.name || getSupplierNameFromId(purchase.supplier_id)}</span><span><strong>Warehouse:</strong> ${purchase.warehouse?.name || getWarehouseNameFromId(purchase.warehouse_id)}</span></div>
+            <div class="info-row"><span><strong>Supplier:</strong> ${purchase.supplier?.name}</span><span><strong>Warehouse:</strong> ${purchase.warehouse?.name}</span></div>
             <div class="info-row"><span><strong>Status:</strong> ${getStatusLabel(purchase.status)}</span><span><strong>Payment:</strong> ${getPaymentStatusLabel(purchase.payment_status)}</span></div>
           </div>
           <table><thead><tr><th>Product</th><th>Quantity</th><th>Unit Cost</th><th>Discount</th><th>Tax</th><th>Total</th></tr></thead><tbody>
-            ${purchase.items?.map(item => `<tr><td>${item.product?.name || 'N/A'}</td><td>${item.quantity}</td><td>৳${formatNumber(item.purchase_price)}</td><td>${item.discount || 0}%</td><td>${item.tax || 0}%</td><td>৳${formatNumber(item.total)}</td></tr>`).join('') || '<tr><td colspan="6">No items found</td></tr>'}
+            ${purchase.items?.map(item => `<tr><td>${item.product?.name}</td><td>${item.quantity}</td><td>৳${formatNumber(item.purchase_price)}</td><td>${item.discount_percent || 0}%</td><td>${item.tax_percent || 0}%</td><td>৳${formatNumber(item.total)}</td>`).join('') || '<tr><td colspan="6">No items found</td></tr>'}
           </tbody></table>
           <div class="totals"><p><strong>Total:</strong> ৳${formatNumber(purchase.total_amount)}</p><p><strong>Paid:</strong> ৳${formatNumber(purchase.paid_amount)}</p><p><strong>Due:</strong> ৳${formatNumber(purchase.total_amount - purchase.paid_amount)}</p></div>
           <div class="footer"><p>Generated on ${new Date().toLocaleString()}</p></div>
@@ -883,45 +455,17 @@ export default {
       printWindow.print()
     }
     
-    watch(() => editForm.paid_amount, (newVal) => {
-      const paid = parseFloat(newVal) || 0
-      if (paid >= editTotalAmount.value && editTotalAmount.value > 0) {
-        editForm.payment_status = 'paid'
-      } else if (paid > 0) {
-        editForm.payment_status = 'partial'
-      } else {
-        editForm.payment_status = 'unpaid'
-      }
-    })
-    
     onMounted(async () => {
-      await Promise.all([loadSuppliers(), loadWarehouses()])
+      await loadSuppliers()
       await loadPurchases()
     })
     
     return {
       loading,
-      editLoading,
-      showEditModal,
-      showAddPaymentModal,
-      editingPurchase,
       purchases,
       suppliers,
-      warehouses,
       filters,
       pagination,
-      editForm,
-      paymentAmount,
-      paymentDate,
-      paymentMethod,
-      editSubtotal,
-      editTotalDiscount,
-      editTotalTax,
-      editTotalAmount,
-      getSupplierNameFromId,
-      getWarehouseNameFromId,
-      getSupplierDisplayName,
-      getWarehouseDisplayName,
       formatNumber,
       formatDate,
       getStatusBadgeClass,
@@ -932,10 +476,6 @@ export default {
       debounceSearch,
       resetFilters,
       changePage,
-      openEditModal,
-      closeEditModal,
-      addPayment,
-      updatePurchase,
       receivePurchase,
       confirmDelete,
       printPurchase
@@ -956,10 +496,5 @@ export default {
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
-}
-
-input:read-only {
-  background-color: #f3f4f6;
-  cursor: not-allowed;
 }
 </style>

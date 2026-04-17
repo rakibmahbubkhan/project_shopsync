@@ -24,6 +24,7 @@ const routes = [
       // Purchases
       { path: 'purchases', name: 'purchases', component: () => import('@/views/purchases/PurchaseList.vue') },
       { path: 'purchases/create', name: 'purchase-create', component: () => import('@/views/purchases/PurchaseCreate.vue') },
+      { path: 'purchases/:id/edit', name: 'purchase-edit', component: () => import('@/views/purchases/PurchaseCreate.vue') },
 
       // Stock Operations
       { path: 'inventory/transfer', name: 'stock-transfer', component: () => import('@/views/inventory/TransferCreate.vue') },

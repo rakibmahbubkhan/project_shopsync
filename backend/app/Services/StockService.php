@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\StockLog;
 use App\Models\InventoryLedger;
+use App\Models\ProductStock;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -11,7 +12,6 @@ use App\Models\Sale;
 use App\Models\SaleReturn;
 use App\Models\Product;
 use App\Models\Warehouse;
-use App\Models\ProductStock;
 
 class StockService
 {
@@ -36,20 +36,33 @@ class StockService
             $referenceId,
             $userId
         ) {
-            // Get or create stock record for this product in this warehouse
-            $stock = StockLog::firstOrCreate(
-                [
-                    'product_id' => $productId,
-                    'warehouse_id' => $warehouseId
-                ],
-                ['quantity' => 0]
-            );
+            // Get or create product stock record
+            $productStock = ProductStock::firstOrNew([
+                'product_id' => $productId,
+                'warehouse_id' => $warehouseId
+            ]);
+            
+            $balanceBefore = $productStock->quantity ?? 0;
+            $newQuantity = $balanceBefore + $quantity;
+            
+            // Set values for new record
+            $productStock->quantity = $newQuantity;
+            $productStock->save();
 
-            // Store balance before for ledger
-            $balanceBefore = $stock->quantity;
-
-            // Increase quantity
-            $stock->increment('quantity', $quantity);
+            // Create stock log entry
+            StockLog::create([
+                'product_id' => $productId,
+                'warehouse_id' => $warehouseId,
+                'reference_type' => $referenceType,
+                'reference_id' => $referenceId,
+                'type' => 'in',
+                'quantity' => $quantity,
+                'old_quantity' => $balanceBefore,
+                'new_quantity' => $newQuantity,
+                'cost_price' => $unitCost,
+                'created_by' => $userId ?? Auth::id(),
+                'notes' => "Stock increased from {$referenceType} #{$referenceId}"
+            ]);
 
             // Create ledger entry
             InventoryLedger::create([
@@ -60,7 +73,7 @@ class StockService
                 'movement_type'  => 'in',
                 'quantity'       => $quantity,
                 'balance_before' => $balanceBefore,
-                'balance_after'  => $stock->quantity,
+                'balance_after'  => $newQuantity,
                 'unit_cost'      => $unitCost,
                 'total_cost'     => $quantity * $unitCost,
                 'user_id'        => $userId ?? Auth::id(),
@@ -74,8 +87,15 @@ class StockService
      * 
      * @throws ValidationException if insufficient stock
      */
-    public function decreaseStock(int $productId,int $warehouseId,float $quantity,float $unitCost,string $referenceType,int $referenceId,?int $userId = null): void 
-    {
+    public function decreaseStock(
+        int $productId,
+        int $warehouseId,
+        float $quantity,
+        float $unitCost,
+        string $referenceType,
+        int $referenceId,
+        ?int $userId = null
+    ): void {
         DB::transaction(function () use (
             $productId,
             $warehouseId,
@@ -86,15 +106,15 @@ class StockService
             $userId
         ) {
             // Get stock record for this product in this warehouse
-            $stock = ProductStock::where('product_id', $productId)
+            $productStock = ProductStock::where('product_id', $productId)
                 ->where('warehouse_id', $warehouseId)
                 ->lockForUpdate()
                 ->first();
 
             // Fix: If record is missing or insufficient stock, provide descriptive error
-            $actualStock = $stock ? $stock->quantity : 0;
+            $actualStock = $productStock ? $productStock->quantity : 0;
             
-            if (!$stock || $actualStock < $quantity) {
+            if (!$productStock || $actualStock < $quantity) {
                 throw ValidationException::withMessages([
                     'stock' => "Insufficient stock in warehouse. " .
                             "Product ID: {$productId}, Warehouse ID: {$warehouseId}, " .
@@ -103,10 +123,26 @@ class StockService
             }
 
             // Store balance before for ledger
-            $balanceBefore = $stock->quantity;
+            $balanceBefore = $productStock->quantity;
+            $newQuantity = $balanceBefore - $quantity;
 
             // Decrease quantity
-            $stock->decrement('quantity', $quantity);
+            $productStock->decrement('quantity', $quantity);
+
+            // Create stock log entry
+            StockLog::create([
+                'product_id' => $productId,
+                'warehouse_id' => $warehouseId,
+                'reference_type' => $referenceType,
+                'reference_id' => $referenceId,
+                'type' => 'out',
+                'quantity' => $quantity,
+                'old_quantity' => $balanceBefore,
+                'new_quantity' => $newQuantity,
+                'cost_price' => $unitCost,
+                'created_by' => $userId ?? Auth::id(),
+                'notes' => "Stock decreased from {$referenceType} #{$referenceId}"
+            ]);
 
             // Create ledger entry
             InventoryLedger::create([
@@ -117,7 +153,7 @@ class StockService
                 'movement_type'  => 'out',
                 'quantity'       => $quantity,
                 'balance_before' => $balanceBefore,
-                'balance_after'  => $stock->quantity,
+                'balance_after'  => $newQuantity,
                 'unit_cost'      => $unitCost,
                 'total_cost'     => $quantity * $unitCost,
                 'user_id'        => $userId ?? Auth::id(),
@@ -178,11 +214,11 @@ class StockService
      */
     public function getStockBalance(int $productId, int $warehouseId): float
     {
-        $stock = StockLog::where('product_id', $productId)
+        $productStock = ProductStock::where('product_id', $productId)
             ->where('warehouse_id', $warehouseId)
             ->first();
 
-        return $stock ? $stock->quantity : 0;
+        return $productStock ? $productStock->quantity : 0;
     }
 
     /**
@@ -190,16 +226,48 @@ class StockService
      */
     public function getTotalStock(int $productId): float
     {
-        return StockLog::where('product_id', $productId)
+        return ProductStock::where('product_id', $productId)
             ->sum('quantity');
     }
 
     /**
      * Get stock movements for a product
      */
-    public function getStockMovements(int $productId, ?int $warehouseId = null,?string $fromDate = null,?string $toDate = null) 
-    {
+    public function getStockMovements(
+        int $productId, 
+        ?int $warehouseId = null,
+        ?string $fromDate = null,
+        ?string $toDate = null
+    ) {
         $query = InventoryLedger::with(['user', 'warehouse'])
+            ->where('product_id', $productId)
+            ->orderBy('created_at', 'desc');
+
+        if ($warehouseId) {
+            $query->where('warehouse_id', $warehouseId);
+        }
+
+        if ($fromDate) {
+            $query->whereDate('created_at', '>=', $fromDate);
+        }
+
+        if ($toDate) {
+            $query->whereDate('created_at', '<=', $toDate);
+        }
+
+        return $query->paginate(15);
+    }
+
+    /**
+     * Get stock logs for a product
+     */
+    public function getStockLogs(
+        int $productId,
+        ?int $warehouseId = null,
+        ?string $fromDate = null,
+        ?string $toDate = null
+    ) {
+        $query = StockLog::with(['product', 'user', 'warehouse'])
             ->where('product_id', $productId)
             ->orderBy('created_at', 'desc');
 
@@ -224,17 +292,17 @@ class StockService
     public function getAverageCost(int $productId, int $warehouseId): float
     {
         // Get warehouse-specific stock record with average cost
-        $stock = ProductStock::where('product_id', $productId)
+        $productStock = ProductStock::where('product_id', $productId)
             ->where('warehouse_id', $warehouseId)
             ->first();
 
-        // Fallback to product's cost price if no warehouse-specific cost exists or avg_cost is invalid
-        if (!$stock || $stock->avg_cost <= 0) {
+        // Fallback to product's cost price if no warehouse-specific cost exists
+        if (!$productStock || $productStock->avg_cost <= 0) {
             $product = Product::find($productId);
             return $product ? $product->cost_price : 0;
         }
 
-        return $stock->avg_cost;
+        return $productStock->avg_cost;
     }
 
     /**
@@ -290,8 +358,13 @@ class StockService
     /**
      * Prepare a return record (pending approval if threshold exceeded).
      */
-    public function prepareSaleReturn(Sale $sale, int $productId, int $quantity, int $userId, string $reason): SaleReturn
-    {
+    public function prepareSaleReturn(
+        Sale $sale, 
+        int $productId, 
+        int $quantity, 
+        int $userId, 
+        string $reason
+    ): SaleReturn {
         $item = $sale->items()
             ->where('product_id', $productId)
             ->firstOrFail();
@@ -323,9 +396,6 @@ class StockService
     /**
      * Finalize stock return (increments stock back).
      */
-    /**
- * Finalize stock return (increments stock back).
- */
     public function finalizeSaleReturn(SaleReturn $return): void
     {
         DB::transaction(function () use ($return) {
@@ -342,7 +412,7 @@ class StockService
                 $productId,
                 $sale->warehouse_id,
                 $quantity,
-                $saleItem->cost_price, // Use cost_price from sale item
+                $saleItem->cost_price,
                 'sale_return',
                 $return->id,
                 $return->created_by
@@ -362,5 +432,24 @@ class StockService
                 'approved_at' => now(),
             ]);
         });
+    }
+
+    /**
+     * Update average cost for a product in a warehouse
+     */
+    public function updateAverageCost(int $productId, int $warehouseId, float $newCost, float $quantity): void
+    {
+        $productStock = ProductStock::where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->first();
+
+        if ($productStock && $productStock->quantity > 0) {
+            $currentTotalCost = $productStock->avg_cost * $productStock->quantity;
+            $newTotalCost = $currentTotalCost + ($newCost * $quantity);
+            $newAvgCost = $newTotalCost / ($productStock->quantity + $quantity);
+            
+            $productStock->avg_cost = $newAvgCost;
+            $productStock->save();
+        }
     }
 }

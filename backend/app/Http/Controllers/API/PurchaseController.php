@@ -10,6 +10,8 @@ use App\Http\Resources\PurchaseCollection;
 use App\Models\Purchase;
 use App\Models\PurchaseItem;
 use App\Models\Warehouse;
+use App\Models\Supplier;
+use App\Models\PurchasePayment; 
 use App\Services\StockService;
 use App\Services\AccountingService;
 use Illuminate\Support\Facades\DB;
@@ -21,7 +23,7 @@ use Illuminate\Support\Facades\Log;
 
 class PurchaseController extends Controller
 {
-    use AuthorizesRequests;
+     use AuthorizesRequests;
 
     protected StockService $stockService;
     protected AccountingService $accountingService;
@@ -31,7 +33,6 @@ class PurchaseController extends Controller
         $this->stockService = $stockService;
         $this->accountingService = $accountingService;
     }
-
     /**
      * GET /api/purchases
      */
@@ -52,10 +53,6 @@ class PurchaseController extends Controller
             $query->where('supplier_id', $request->supplier_id);
         }
 
-        if ($request->filled('warehouse_id')) {
-            $query->where('warehouse_id', $request->warehouse_id);
-        }
-
         if ($request->filled('date_from') && $request->filled('date_to')) {
             $query->whereBetween('purchase_date', [$request->date_from, $request->date_to]);
         }
@@ -71,6 +68,11 @@ class PurchaseController extends Controller
         }
 
         $purchases = $query->latest()->paginate($request->per_page ?? 15);
+        
+        // Load additional relationships for each purchase
+        $purchases->getCollection()->each(function ($purchase) {
+            $purchase->load(['supplier', 'warehouse', 'items.product', 'payments']);
+        });
 
         return new PurchaseCollection($purchases);
     }
@@ -82,44 +84,71 @@ class PurchaseController extends Controller
     {
         try {
             return DB::transaction(function () use ($request) {
-                $totalAmount = 0;
+                $subtotal = (float) $request->subtotal ?? 0;
+                $totalDiscount = (float) $request->total_discount ?? 0;
+                $totalTax = (float) $request->total_tax ?? 0;
+                $totalAmount = (float) $request->total_amount ?? 0;
                 $paidAmount = (float) ($request->paid_amount ?? 0);
+                $shippingCost = (float) ($request->shipping_cost ?? 0);
+                
+                // Calculate final total with shipping
+                $finalTotal = $totalAmount + $shippingCost;
+                
+                // Determine payment status
+                $paymentStatus = $this->determinePaymentStatus($paidAmount, $finalTotal);
 
-                // 1️⃣ Create Purchase
+                // 1️⃣ Create Purchase with all fields
                 $purchase = Purchase::create([
-                    'supplier_id'    => $request->supplier_id,
-                    'warehouse_id'   => $request->warehouse_id,
-                    'user_id'        => Auth::id(),
-                    'purchase_date'  => $request->purchase_date ?? now(),
-                    'reference_no'   => $this->generateReferenceNumber(),
-                    'total_amount'   => 0, // Will update after items
-                    'paid_amount'    => $paidAmount,
-                    'payment_status' => 'unpaid', // Will update after total calculation
-                    'status'         => $request->status ?? 'ordered',
+                    'supplier_id' => $request->supplier_id,
+                    'warehouse_id' => $request->warehouse_id,
+                    'purchase_date' => $request->purchase_date ?? now(),
+                    'reference_no' => $this->generateReferenceNumber(),
+                    'subtotal' => $subtotal,
+                    'total_discount' => $totalDiscount,
+                    'total_tax' => $totalTax,
+                    'total_amount' => $finalTotal,
+                    'paid_amount' => $paidAmount,
+                    'payment_status' => $paymentStatus,
+                    'status' => $request->status ?? 'ordered',
+                    'notes' => $request->notes ?? null,
+                    'shipping_method' => $request->shipping_method ?? null,
+                    'shipping_cost' => $shippingCost,
+                    'payment_method' => $request->payment_method ?? null,
+                    'expected_delivery_date' => $request->expected_delivery_date ?? null,
+                    'delivered_date' => $request->status === 'received' ? now() : null,
+                    'created_by' => Auth::id(),
                 ]);
 
-                // 2️⃣ Create Purchase Items + Update Stock
+                // 2️⃣ Create Purchase Items
                 foreach ($request->items as $item) {
                     $quantity = (float) $item['quantity'];
                     $purchasePrice = (float) $item['purchase_price'];
-                    $subtotal = $quantity * $purchasePrice;
+                    $itemSubtotal = $quantity * $purchasePrice;
                     
-                    // Calculate discount and tax if provided
-                    $discountAmount = ($subtotal * ((float) ($item['discount'] ?? 0))) / 100;
-                    $taxAmount = (($subtotal - $discountAmount) * ((float) ($item['tax'] ?? 0))) / 100;
-                    $itemTotal = $subtotal - $discountAmount + $taxAmount;
+                    // Calculate discount and tax
+                    $discountPercent = (float) ($item['discount_percent'] ?? 0);
+                    $discountAmount = ($itemSubtotal * $discountPercent) / 100;
                     
-                    $totalAmount += $itemTotal;
+                    $taxPercent = (float) ($item['tax_percent'] ?? 0);
+                    $taxableAmount = $itemSubtotal - $discountAmount;
+                    $taxAmount = ($taxableAmount * $taxPercent) / 100;
+                    
+                    $itemTotal = $itemSubtotal - $discountAmount + $taxAmount;
 
                     PurchaseItem::create([
-                        'purchase_id'    => $purchase->id,
-                        'product_id'     => $item['product_id'],
-                        'quantity'       => $quantity,
+                        'purchase_id' => $purchase->id,
+                        'product_id' => $item['product_id'],
+                        'quantity' => $quantity,
                         'purchase_price' => $purchasePrice,
-                        'discount'       => (float) ($item['discount'] ?? 0),
-                        'tax'            => (float) ($item['tax'] ?? 0),
-                        'subtotal'       => $subtotal,
-                        'total'          => $itemTotal,
+                        'subtotal' => $itemSubtotal,
+                        'discount_percent' => $discountPercent,
+                        'discount_amount' => $discountAmount,
+                        'tax_percent' => $taxPercent,
+                        'tax_amount' => $taxAmount,
+                        'total' => $itemTotal,
+                        'batch_no' => $item['batch_no'] ?? null,
+                        'expiry_date' => $item['expiry_date'] ?? null,
+                        'notes' => $item['notes'] ?? null,
                     ]);
 
                     // 📦 Increase stock if status is 'received'
@@ -136,21 +165,27 @@ class PurchaseController extends Controller
                     }
                 }
 
-                // 3️⃣ Update total amount and payment status
-                $paymentStatus = $this->determinePaymentStatus($paidAmount, $totalAmount);
-                
-                $purchase->update([
-                    'total_amount'   => $totalAmount,
-                    'payment_status' => $paymentStatus
-                ]);
+                // 3️⃣ Create initial payment if paid_amount > 0
+                if ($paidAmount > 0) {
+                    PurchasePayment::create([
+                        'purchase_id' => $purchase->id,
+                        'amount' => $paidAmount,
+                        'payment_date' => $request->purchase_date ?? now(),
+                        'payment_method' => $request->payment_method ?? 'cash',
+                        'reference_no' => $request->payment_reference_no ?? null,
+                        'notes' => 'Initial payment',
+                        'installment_number' => 1,
+                        'created_by' => Auth::id(),
+                    ]);
+                }
 
                 // 4️⃣ Post to Accounting if status is 'received'
                 if ($request->status === 'received') {
-                    $this->postToAccounting($purchase, (float) $totalAmount);
+                    $this->postToAccounting($purchase, (float) $finalTotal);
                 }
 
                 return new PurchaseResource(
-                    $purchase->load(['supplier', 'warehouse', 'user', 'items.product'])
+                    $purchase->load(['supplier', 'warehouse', 'user', 'items.product', 'payments'])
                 );
             });
         } catch (\Exception $e) {
@@ -161,13 +196,10 @@ class PurchaseController extends Controller
         }
     }
 
-    /**
-     * GET /api/purchases/{id}
-     */
-    public function show(Purchase $purchase): PurchaseResource
+   public function show(Purchase $purchase): PurchaseResource
     {
         return new PurchaseResource(
-            $purchase->load(['supplier', 'warehouse', 'user', 'items.product.unit'])
+            $purchase->load(['supplier', 'warehouse', 'user', 'items.product', 'payments'])
         );
     }
 
@@ -180,86 +212,21 @@ class PurchaseController extends Controller
             $this->validatePurchaseModifiable($purchase);
 
             return DB::transaction(function () use ($request, $purchase) {
-                $totalAmount = 0;
-                $oldStatus = $purchase->status;
-
-                // 1️⃣ Reverse previous stock if it was received
-                if ($oldStatus === 'received') {
-                    foreach ($purchase->items as $item) {
-                        $this->stockService->decreaseStock(
-                            $item->product_id,
-                            $purchase->warehouse_id,
-                            (float) $item->quantity,
-                            $item->purchase_price,
-                            'purchase_update_reverse',
-                            $purchase->id,
-                            Auth::id()
-                        );
-                    }
-                }
-
-                // 2️⃣ Delete old items
-                $purchase->items()->delete();
-
-                // 3️⃣ Create new items
-                foreach ($request->items as $item) {
-                    $quantity = (float) $item['quantity'];
-                    $purchasePrice = (float) $item['purchase_price'];
-                    $subtotal = $quantity * $purchasePrice;
-                    
-                    $discountAmount = ($subtotal * ((float) ($item['discount'] ?? 0))) / 100;
-                    $taxAmount = (($subtotal - $discountAmount) * ((float) ($item['tax'] ?? 0))) / 100;
-                    $itemTotal = $subtotal - $discountAmount + $taxAmount;
-                    
-                    $totalAmount += $itemTotal;
-
-                    PurchaseItem::create([
-                        'purchase_id'    => $purchase->id,
-                        'product_id'     => $item['product_id'],
-                        'quantity'       => $quantity,
-                        'purchase_price' => $purchasePrice,
-                        'discount'       => (float) ($item['discount'] ?? 0),
-                        'tax'            => (float) ($item['tax'] ?? 0),
-                        'subtotal'       => $subtotal,
-                        'total'          => $itemTotal,
-                    ]);
-
-                    // 📦 Increase stock if new status is 'received'
-                    if ($request->status === 'received') {
-                        $this->stockService->increaseStock(
-                            $item['product_id'],
-                            $request->warehouse_id ?? $purchase->warehouse_id,
-                            $quantity,
-                            $purchasePrice,
-                            'purchase_update',
-                            $purchase->id,
-                            Auth::id()
-                        );
-                    }
-                }
-
-                // 4️⃣ Determine payment status
+                // Only update payment and status fields
                 $paidAmount = (float) ($request->paid_amount ?? $purchase->paid_amount);
+                $totalAmount = (float) $purchase->total_amount;
                 $paymentStatus = $this->determinePaymentStatus($paidAmount, $totalAmount);
 
-                // 5️⃣ Update purchase
+                // Update purchase
                 $purchase->update([
-                    'supplier_id'     => $request->supplier_id,
-                    'warehouse_id'    => $request->warehouse_id ?? $purchase->warehouse_id,
-                    'purchase_date'   => $request->purchase_date ?? $purchase->purchase_date,
-                    'total_amount'    => $totalAmount,
-                    'paid_amount'     => $paidAmount,
-                    'payment_status'  => $paymentStatus,
-                    'status'          => $request->status ?? $purchase->status,
+                    'paid_amount' => $paidAmount,
+                    'payment_status' => $paymentStatus,
+                    'status' => $request->status ?? $purchase->status,
+                    'updated_by' => Auth::id(),
                 ]);
 
-                // 6️⃣ Handle accounting if status changed to received
-                if ($request->status === 'received' && $oldStatus !== 'received') {
-                    $this->postToAccounting($purchase, (float) $totalAmount);
-                }
-
                 return new PurchaseResource(
-                    $purchase->load(['supplier', 'warehouse', 'user', 'items.product'])
+                    $purchase->load(['supplier', 'warehouse', 'user', 'items.product', 'payments'])
                 );
             });
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
@@ -297,15 +264,18 @@ class PurchaseController extends Controller
                     }
                 }
 
-                // Delete purchase items first (though cascading should handle it)
+                // Delete payments first
+                $purchase->payments()->delete();
+                
+                // Delete purchase items
                 $purchase->items()->delete();
                 
                 // Delete purchase
                 $purchase->delete();
 
                 return response()->json([
-                    'message'      => 'Purchase deleted successfully.',
-                    'purchase_id'  => $purchase->id
+                    'message' => 'Purchase deleted successfully.',
+                    'purchase_id' => $purchase->id
                 ]);
             });
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
@@ -342,15 +312,19 @@ class PurchaseController extends Controller
                     );
                 }
 
-                // Update purchase status
-                $purchase->update(['status' => 'received']);
+                // Update purchase status and delivered date
+                $purchase->update([
+                    'status' => 'received',
+                    'delivered_date' => now(),
+                    'updated_by' => Auth::id(),
+                ]);
 
-                // Post to accounting - FIX: Cast to float
+                // Post to accounting
                 $this->postToAccounting($purchase, (float) $purchase->total_amount);
 
                 return response()->json([
                     'message' => 'Purchase received successfully',
-                    'purchase' => new PurchaseResource($purchase->load(['supplier', 'warehouse', 'user', 'items.product']))
+                    'purchase' => new PurchaseResource($purchase->load(['supplier', 'warehouse', 'user', 'items.product', 'payments']))
                 ]);
             });
         } catch (\Exception $e) {
@@ -386,13 +360,29 @@ class PurchaseController extends Controller
                     ], 400);
                 }
 
+                // Get the next installment number
+                $lastPayment = $purchase->payments()->latest('installment_number')->first();
+                $installmentNumber = $lastPayment ? $lastPayment->installment_number + 1 : 1;
+
+                // Create payment record
+                $payment = $purchase->payments()->create([
+                    'amount' => $paymentAmount,
+                    'payment_date' => $validated['payment_date'],
+                    'payment_method' => $validated['payment_method'],
+                    'reference_no' => $validated['reference_no'] ?? null,
+                    'notes' => $validated['notes'] ?? null,
+                    'installment_number' => $installmentNumber,
+                    'created_by' => Auth::id()
+                ]);
+
                 // Determine new payment status
                 $paymentStatus = $this->determinePaymentStatus($newPaidAmount, $totalAmount);
 
                 // Update purchase with new paid amount and status
                 $purchase->update([
                     'paid_amount' => $newPaidAmount,
-                    'payment_status' => $paymentStatus
+                    'payment_status' => $paymentStatus,
+                    'updated_by' => Auth::id(),
                 ]);
 
                 // Update accounting entries
@@ -400,7 +390,8 @@ class PurchaseController extends Controller
 
                 return response()->json([
                     'message' => 'Payment added successfully',
-                    'purchase' => new PurchaseResource($purchase->load(['supplier', 'warehouse']))
+                    'payment' => $payment,
+                    'purchase' => new PurchaseResource($purchase->load(['supplier', 'warehouse', 'payments']))
                 ]);
             });
         } catch (\Exception $e) {
@@ -469,16 +460,16 @@ class PurchaseController extends Controller
     private function postToAccounting(Purchase $purchase, float $totalAmount): void
     {
         // Get account IDs from config or use defaults
-        $inventoryAccountId = config('accounts.inventory', 4); // Default to 4 if not set
-        $accountsPayableId = config('accounts.accounts_payable', 5); // Default to 5 if not set
+        $inventoryAccountId = config('accounts.inventory', 4);
+        $accountsPayableId = config('accounts.accounts_payable', 5);
 
         // Post to Accounting: Debit Inventory, Credit Accounts Payable
         $this->accountingService->createEntry(
             $purchase->purchase_date,
             "Purchase Invoice #{$purchase->reference_no}",
             [
-                ['account_id' => $inventoryAccountId, 'debit' => $totalAmount, 'credit' => 0], // Inventory Asset
-                ['account_id' => $accountsPayableId, 'debit' => 0, 'credit' => $totalAmount], // Accounts Payable
+                ['account_id' => $inventoryAccountId, 'debit' => $totalAmount, 'credit' => 0],
+                ['account_id' => $accountsPayableId, 'debit' => 0, 'credit' => $totalAmount],
             ],
             'purchase',
             $purchase->id
@@ -489,7 +480,7 @@ class PurchaseController extends Controller
     {
         // Get account IDs from config or use defaults
         $accountsPayableId = config('accounts.accounts_payable', 5);
-        $cashAccountId = config('accounts.cash', 1); // Default to 1 if not set
+        $cashAccountId = config('accounts.cash', 1);
 
         // Post payment entry: Debit Accounts Payable, Credit Cash/Bank
         $this->accountingService->createEntry(

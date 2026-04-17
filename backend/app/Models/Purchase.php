@@ -13,24 +13,44 @@ class Purchase extends Model
         'warehouse_id',
         'purchase_date',
         'reference_no',
+        'subtotal',
+        'total_discount',
+        'total_tax',
         'total_amount',
         'paid_amount',
         'payment_status',
-        'status', // ordered, received, pending
-        'created_by'
+        'status',
+        'notes',
+        'shipping_method',
+        'shipping_cost',
+        'payment_method',
+        'expected_delivery_date',
+        'delivered_date',
+        'created_by',
+        'updated_by'
     ];
 
     protected $casts = [
         'purchase_date' => 'date',
+        'expected_delivery_date' => 'date',
+        'delivered_date' => 'date',
+        'subtotal' => 'decimal:2',
+        'total_discount' => 'decimal:2',
+        'total_tax' => 'decimal:2',
         'total_amount' => 'decimal:2',
         'paid_amount' => 'decimal:2',
+        'shipping_cost' => 'decimal:2',
     ];
 
     protected $attributes = [
         'status' => 'pending',
         'payment_status' => 'unpaid',
         'paid_amount' => 0,
-        'total_amount' => 0
+        'total_amount' => 0,
+        'subtotal' => 0,
+        'total_discount' => 0,
+        'total_tax' => 0,
+        'shipping_cost' => 0
     ];
 
     // Relationships
@@ -49,9 +69,19 @@ class Purchase extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function updater()
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
+
     public function items()
     {
         return $this->hasMany(PurchaseItem::class);
+    }
+
+    public function payments()
+    {
+        return $this->hasMany(PurchasePayment::class);
     }
 
     // Scopes
@@ -104,31 +134,19 @@ class Purchase extends Model
         return 0;
     }
 
-     public function getFormattedTotalAttribute(): string
+    public function getFormattedTotalAttribute(): string
     {
         return $this->total_amount ? number_format((float) $this->total_amount, 2, '.', '') : '0.00';
     }
 
-    /**
-     * Get formatted paid amount
-     */
     public function getFormattedPaidAttribute(): string
     {
         return $this->paid_amount ? number_format((float) $this->paid_amount, 2, '.', '') : '0.00';
     }
 
-    /**
-     * Get formatted due amount
-     */
     public function getFormattedDueAttribute(): string
     {
         return $this->due_amount ? number_format((float) $this->due_amount, 2, '.', '') : '0.00';
-    }
-
-    // Mutators
-    public function setPurchaseDateAttribute($value)
-    {
-        $this->attributes['purchase_date'] = $value;
     }
 
     // Boot method
@@ -139,17 +157,6 @@ class Purchase extends Model
         static::creating(function ($purchase) {
             if (empty($purchase->reference_no)) {
                 $purchase->reference_no = static::generateReferenceNumber();
-            }
-        });
-
-        static::updating(function ($purchase) {
-            // Update payment status based on paid amount
-            if ($purchase->paid_amount >= $purchase->total_amount) {
-                $purchase->payment_status = 'paid';
-            } elseif ($purchase->paid_amount > 0) {
-                $purchase->payment_status = 'partial';
-            } else {
-                $purchase->payment_status = 'unpaid';
             }
         });
     }
@@ -187,28 +194,6 @@ class Purchase extends Model
         }
         
         $this->saveQuietly();
-        return $this;
-    }
-
-    public function markAsReceived()
-    {
-        $this->status = 'received';
-        $this->saveQuietly();
-        
-        // Update stock for each item
-        foreach ($this->items as $item) {
-            // Create stock log or update inventory
-            StockLog::create([
-                'product_id' => $item->product_id,
-                'warehouse_id' => $this->warehouse_id,
-                'reference_type' => 'purchase',
-                'reference_id' => $this->id,
-                'type' => 'in',
-                'quantity' => $item->quantity,
-                'created_by' => Auth::id(),
-            ]);
-        }
-        
         return $this;
     }
 }

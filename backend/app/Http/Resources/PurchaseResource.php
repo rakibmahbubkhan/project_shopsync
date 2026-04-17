@@ -19,7 +19,8 @@ class PurchaseResource extends JsonResource
             'payment_status' => $this->payment_status,
             'status' => $this->status,
             'payment_progress' => $this->payment_progress,
-            
+            'supplier_id' => $this->supplier_id,
+            'warehouse_id' => $this->warehouse_id,
             'supplier' => new SupplierResource($this->whenLoaded('supplier')),
             'warehouse' => new WarehouseResource($this->whenLoaded('warehouse')),
             'created_by' => new UserResource($this->whenLoaded('user')),
