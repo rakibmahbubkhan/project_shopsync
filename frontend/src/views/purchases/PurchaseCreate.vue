@@ -578,54 +578,57 @@ export default {
     })
     
     // Computed Properties
-    const subtotal = computed(() => {
-      return cart.value.reduce((sum, item) => {
-        const qty = parseFloat(item.quantity) || 0
-        const price = parseFloat(item.purchase_price) || 0
-        return sum + (qty * price)
-      }, 0)
-    })
-    
-    const totalDiscount = computed(() => {
-      if (isEditMode.value) {
-        // Calculate from individual items in edit mode
-        return cart.value.reduce((sum, item) => {
-          const qty = parseFloat(item.quantity) || 0
-          const price = parseFloat(item.purchase_price) || 0
-          const discount = parseFloat(item.discount) || 0
-          const itemSubtotal = qty * price
-          const discountAmount = (itemSubtotal * discount) / 100
-          return sum + (isNaN(discountAmount) ? 0 : discountAmount)
-        }, 0)
-      } else {
-        // Use average discount for create mode
-        return (subtotal.value * (parseFloat(form.average_discount) || 0)) / 100
-      }
-    })
+// Computed Properties
+const subtotal = computed(() => {
+  let sum = 0
+  for (const item of cart.value) {
+    const qty = parseFloat(item.quantity) || 0
+    const price = parseFloat(item.purchase_price) || 0
+    sum += qty * price
+  }
+  console.log('Subtotal calculated:', sum)
+  return sum
+})
+
+const totalDiscount = computed(() => {
+  let sum = 0
+  for (const item of cart.value) {
+    const qty = parseFloat(item.quantity) || 0
+    const price = parseFloat(item.purchase_price) || 0
+    const discount = parseFloat(item.discount) || 0
+    const itemSubtotal = qty * price
+    const discountAmount = (itemSubtotal * discount) / 100
+    sum += isNaN(discountAmount) ? 0 : discountAmount
+  }
+  console.log('Total Discount calculated:', sum)
+  return sum
+})
+
+const totalTax = computed(() => {
+  let sum = 0
+  for (const item of cart.value) {
+    const qty = parseFloat(item.quantity) || 0
+    const price = parseFloat(item.purchase_price) || 0
+    const discount = parseFloat(item.discount) || 0
+    const tax = parseFloat(item.tax) || 0
+    const itemSubtotal = qty * price
+    const discountAmount = (itemSubtotal * discount) / 100
+    const taxableAmount = itemSubtotal - discountAmount
+    const taxAmount = (taxableAmount * tax) / 100
+    sum += isNaN(taxAmount) ? 0 : taxAmount
+  }
+  console.log('Total Tax calculated:', sum)
+  return sum
+})
+
+const totalAmount = computed(() => {
+  const amount = subtotal.value - totalDiscount.value + totalTax.value
+  console.log('Total Amount calculated:', amount)
+  return isNaN(amount) ? 0 : amount
+})
     
     const taxableAmount = computed(() => subtotal.value - totalDiscount.value)
     
-    const totalTax = computed(() => {
-      if (isEditMode.value) {
-        // Calculate from individual items in edit mode
-        return cart.value.reduce((sum, item) => {
-          const qty = parseFloat(item.quantity) || 0
-          const price = parseFloat(item.purchase_price) || 0
-          const discount = parseFloat(item.discount) || 0
-          const tax = parseFloat(item.tax) || 0
-          const itemSubtotal = qty * price
-          const discountAmount = (itemSubtotal * discount) / 100
-          const taxableAmount = itemSubtotal - discountAmount
-          const taxAmount = (taxableAmount * tax) / 100
-          return sum + (isNaN(taxAmount) ? 0 : taxAmount)
-        }, 0)
-      } else {
-        // Use average tax for create mode
-        return (taxableAmount.value * (parseFloat(form.average_tax) || 0)) / 100
-      }
-    })
-    
-    const totalAmount = computed(() => taxableAmount.value + totalTax.value)
     
     const totalQuantity = computed(() => {
       return cart.value.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0)
@@ -645,10 +648,10 @@ export default {
              cart.value.length > 0
     })
     
-    const remainingBalance = computed(() => {
-      const balance = totalAmount.value - form.paid_amount
-      return isNaN(balance) ? 0 : Math.max(0, balance)
-    })    
+const remainingBalance = computed(() => {
+  const balance = totalAmount.value - form.paid_amount
+  return isNaN(balance) ? 0 : Math.max(0, balance)
+})  
     // Methods
     const formatNumber = (value) => {
       const num = parseFloat(value || 0)
@@ -691,18 +694,31 @@ export default {
     }
     
     const calculateItemTotal = (item) => {
-      const quantity = parseFloat(item.quantity) || 0
-      const price = parseFloat(item.purchase_price) || 0
-      const discount = parseFloat(item.discount) || 0
-      const tax = parseFloat(item.tax) || 0
-      
-      const itemSubtotal = quantity * price
-      const discountAmount = (itemSubtotal * discount) / 100
-      const taxableAmount = itemSubtotal - discountAmount
-      const taxAmount = (taxableAmount * tax) / 100
-      
-      item.total = itemSubtotal - discountAmount + taxAmount
-    }
+  if (!item) return
+  
+  const quantity = parseFloat(item.quantity) || 0
+  const price = parseFloat(item.purchase_price) || 0
+  const discount = parseFloat(item.discount) || 0
+  const tax = parseFloat(item.tax) || 0
+  
+  const itemSubtotal = quantity * price
+  const discountAmount = (itemSubtotal * discount) / 100
+  const taxableAmount = itemSubtotal - discountAmount
+  const taxAmount = (taxableAmount * tax) / 100
+  const total = itemSubtotal - discountAmount + taxAmount
+  
+  item.total = isNaN(total) ? 0 : total
+  
+  // Also store the calculated values for debugging
+  item._calculated = {
+    subtotal: itemSubtotal,
+    discountAmount: discountAmount,
+    taxAmount: taxAmount,
+    total: total
+  }
+  
+  return item.total
+}
     
     const searchProducts = () => {
       clearTimeout(searchTimeout.value)
@@ -769,48 +785,76 @@ export default {
       }
     }
     
-    const loadPurchaseData = async () => {
-      if (!isEditMode.value) return
+  const loadPurchaseData = async () => {
+    if (!isEditMode.value) return
+    
+    loading.value = true
+    try {
+      const response = await api.get(`/purchases/${purchaseId.value}`)
+      console.log('API Response:', response.data)
       
-      loading.value = true
-      try {
-        const response = await api.get(`/purchases/${purchaseId.value}`)
-        const data = response.data.data
-        purchaseData.value = data
-        
-        // Set form values with proper date formatting
-        form.supplier_id = data.supplier_id
-        form.warehouse_id = data.warehouse_id
-        form.purchase_date = formatDateForInput(data.purchase_date)
-        form.status = data.status
-        form.payment_status = data.payment_status
-        form.paid_amount = parseFloat(data.paid_amount) || 0
-        form.average_discount = data.discount_percent || 0
-        form.average_tax = data.tax_percent || 0
-        
-        // Load payments
-        payments.value = data.payments || []
-        
-        // Load cart items with all fields
-        cart.value = data.items.map(item => ({
-          id: item.id,
-          product_id: item.product_id,
-          name: item.product?.name || 'Product',
-          sku: item.product?.sku || item.product?.code,
-          quantity: parseFloat(item.quantity),
-          purchase_price: parseFloat(item.purchase_price),
-          discount: parseFloat(item.discount_percent || 0),
-          tax: parseFloat(item.tax_percent || 0),
-          total: parseFloat(item.total)
-        }))
-      } catch (error) {
-        console.error('Failed to load purchase:', error)
-        alert('Failed to load purchase details')
-        router.push('/purchases')
-      } finally {
-        loading.value = false
+      // Check if response has the expected structure
+      let data
+      if (response.data.data) {
+        data = response.data.data
+      } else if (response.data.success && response.data.data) {
+        data = response.data.data
+      } else {
+        data = response.data
       }
+      
+      console.log('Purchase data:', data)
+      purchaseData.value = data
+      
+      // Set form values with proper date formatting
+      form.supplier_id = data.supplier_id
+      form.warehouse_id = data.warehouse_id
+      form.purchase_date = formatDateForInput(data.purchase_date)
+      form.status = data.status
+      form.payment_status = data.payment_status
+      form.paid_amount = parseFloat(data.paid_amount) || 0
+      
+      // Load cart items with proper mapping
+      if (data.items && Array.isArray(data.items)) {
+        cart.value = data.items.map(item => {
+          const cartItem = {
+            id: item.id,
+            product_id: item.product_id,
+            name: item.product?.name || 'Product',
+            sku: item.product?.sku || item.product?.code,
+            quantity: parseFloat(item.quantity) || 0,
+            purchase_price: parseFloat(item.purchase_price) || 0,
+            discount: parseFloat(item.discount_percent) || 0,
+            tax: parseFloat(item.tax_percent) || 0,
+            total: parseFloat(item.total) || 0
+          }
+          
+          // Recalculate total to ensure it's correct
+          calculateItemTotal(cartItem)
+          
+          return cartItem
+        })
+      } else {
+        cart.value = []
+      }
+      
+      // Load payments
+      payments.value = data.payments || []
+      
+      console.log('Loaded cart items:', cart.value)
+      console.log('Subtotal:', subtotal.value)
+      console.log('Total Amount:', totalAmount.value)
+      
+    } catch (error) {
+      console.error('Failed to load purchase:', error)
+      console.error('Error response:', error.response)
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to load purchase details'
+      alert(errorMessage)
+      router.push('/purchases')
+    } finally {
+      loading.value = false
     }
+  }
     
     const addPayment = async () => {
       if (!newPayment.amount || newPayment.amount <= 0) {
@@ -974,6 +1018,16 @@ export default {
         form.paid_amount = newTotal
       }
     })
+
+    // Watch for cart changes to recalculate totals
+watch(cart, () => {
+  console.log('Cart changed, recalculating totals...')
+  // Force recalculation by accessing computed properties
+  subtotal.value
+  totalDiscount.value
+  totalTax.value
+  totalAmount.value
+}, { deep: true })
     
     // Initialize on mount - single onMounted
     onMounted(async () => {

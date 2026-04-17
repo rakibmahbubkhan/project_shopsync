@@ -196,11 +196,86 @@ class PurchaseController extends Controller
         }
     }
 
-   public function show(Purchase $purchase): PurchaseResource
+/**
+ * GET /api/purchases/{id}
+ */
+/**
+ * GET /api/purchases/{id}
+ */
+    public function show(Purchase $purchase): JsonResponse
     {
-        return new PurchaseResource(
-            $purchase->load(['supplier', 'warehouse', 'user', 'items.product', 'payments'])
-        );
+        try {
+            // Load all necessary relationships
+            $purchase->load([
+                'supplier', 
+                'warehouse', 
+                'user', 
+                'items.product',
+                'payments'
+            ]);
+            
+            // Return as JSON directly instead of using Resource
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'id' => $purchase->id,
+                    'supplier_id' => $purchase->supplier_id,
+                    'supplier' => $purchase->supplier,
+                    'warehouse_id' => $purchase->warehouse_id,
+                    'warehouse' => $purchase->warehouse,
+                    'user' => $purchase->user,
+                    'purchase_date' => $purchase->purchase_date,
+                    'reference_no' => $purchase->reference_no,
+                    'subtotal' => $purchase->subtotal,
+                    'total_discount' => $purchase->total_discount,
+                    'total_tax' => $purchase->total_tax,
+                    'total_amount' => $purchase->total_amount,
+                    'paid_amount' => $purchase->paid_amount,
+                    'payment_status' => $purchase->payment_status,
+                    'status' => $purchase->status,
+                    'notes' => $purchase->notes,
+                    'shipping_method' => $purchase->shipping_method,
+                    'shipping_cost' => $purchase->shipping_cost,
+                    'payment_method' => $purchase->payment_method,
+                    'expected_delivery_date' => $purchase->expected_delivery_date,
+                    'delivered_date' => $purchase->delivered_date,
+                    'created_at' => $purchase->created_at,
+                    'updated_at' => $purchase->updated_at,
+                    'items' => $purchase->items->map(function ($item) {
+                        return [
+                            'id' => $item->id,
+                            'product_id' => $item->product_id,
+                            'product' => $item->product,
+                            'quantity' => (float) $item->quantity,
+                            'purchase_price' => (float) $item->purchase_price,
+                            'subtotal' => (float) $item->subtotal,
+                            'discount_percent' => (float) ($item->discount_percent ?? 0),
+                            'discount_amount' => (float) ($item->discount_amount ?? 0),
+                            'tax_percent' => (float) ($item->tax_percent ?? 0),
+                            'tax_amount' => (float) ($item->tax_amount ?? 0),
+                            'total' => (float) $item->total,
+                        ];
+                    }),
+                    'payments' => $purchase->payments->map(function ($payment) {
+                        return [
+                            'id' => $payment->id,
+                            'amount' => (float) $payment->amount,
+                            'payment_date' => $payment->payment_date,
+                            'payment_method' => $payment->payment_method,
+                            'reference_no' => $payment->reference_no,
+                            'installment_number' => $payment->installment_number,
+                            'created_at' => $payment->created_at,
+                        ];
+                    }),
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Purchase show failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to load purchase details: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**

@@ -3,50 +3,31 @@
 
 namespace App\Http\Resources;
 
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class PurchaseItemResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return array
-     */
-    public function toArray($request)
+    public function toArray(Request $request): array
     {
         return [
             'id' => $this->id,
             'purchase_id' => $this->purchase_id,
             'product_id' => $this->product_id,
-            'quantity' => (float) $this->quantity,
-            'cost_price' => (float) $this->cost_price,
-            'subtotal' => (float) $this->subtotal,
-            
-            // Relationships
             'product' => new ProductResource($this->whenLoaded('product')),
-            'purchase' => new PurchaseResource($this->whenLoaded('purchase')),
-            
-            // Computed fields
-            'total' => (float) ($this->quantity * $this->cost_price),
-            
-            // Formatted values
-            'formatted' => [
-                'quantity' => number_format($this->quantity, 2),
-                'cost_price' => number_format($this->cost_price, 2),
-                'subtotal' => number_format($this->subtotal, 2),
-                'total' => number_format($this->quantity * $this->cost_price, 2),
-            ],
-            
-            // Product details when loaded (for quick access)
-            'product_details' => $this->whenLoaded('product', function() {
-                return [
-                    'name' => $this->product->name,
-                    'sku' => $this->product->sku ?? null,
-                    'code' => $this->product->code ?? null,
-                    'unit' => $this->product->unit ?? null,
-                ];
-            }),
+            'quantity' => $this->quantity,
+            'purchase_price' => $this->purchase_price,
+            'subtotal' => $this->subtotal,
+            'discount_percent' => $this->discount_percent ?? 0,
+            'discount_amount' => $this->discount_amount ?? 0,
+            'tax_percent' => $this->tax_percent ?? 0,
+            'tax_amount' => $this->tax_amount ?? 0,
+            'total' => $this->total,
+            'batch_no' => $this->batch_no,
+            'expiry_date' => $this->expiry_date,
+            'notes' => $this->notes,
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
         ];
     }
 }
