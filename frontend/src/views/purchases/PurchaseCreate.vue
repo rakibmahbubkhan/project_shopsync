@@ -328,117 +328,129 @@
               </div>
 
               <!-- ============ INSTALLMENT PAYMENTS SECTION (EDIT MODE ONLY) ============ -->
-              <div v-if="isEditMode" class="border-t border-gray-200 pt-4">
-                <div class="flex items-center justify-between mb-3">
-                  <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Installment Payments</label>
-                  <span class="text-xs text-gray-400">Total: ৳{{ formatNumber(totalAmount) }}</span>
+            <div v-if="isEditMode" class="border-t border-gray-200 pt-4">
+              <div class="flex items-center justify-between mb-3">
+                <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Installment Payments</label>
+                <span class="text-xs text-gray-400">Total: ৳{{ formatNumber(totalAmount) }}</span>
+              </div>
+              
+              <!-- List of all installment payments -->
+              <div class="space-y-3 max-h-80 overflow-y-auto pr-1">
+                <div v-for="(payment, idx) in payments" :key="payment.id" class="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                  <div class="flex justify-between items-start mb-2">
+                    <div>
+                      <span class="font-semibold text-indigo-600 text-sm">Installment #{{ payment.installment_number }}</span>
+                      <div class="text-xs text-gray-500 mt-1">
+                        {{ formatDate(payment.payment_date) }} • {{ getPaymentMethodLabel(payment.payment_method) }}
+                      </div>
+                      <div v-if="payment.reference_no" class="text-xs text-gray-400 mt-1">
+                        Ref: {{ payment.reference_no }}
+                      </div>
+                    </div>
+                    <span class="text-green-600 font-bold text-lg">৳{{ formatNumber(payment.amount) }}</span>
+                  </div>
                 </div>
                 
-                <!-- List of all installment payments -->
-                <div class="space-y-3 max-h-80 overflow-y-auto pr-1">
-                  <div v-for="(payment, idx) in payments" :key="payment.id" class="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                    <div class="flex justify-between items-start mb-2">
-                      <div>
-                        <span class="font-semibold text-indigo-600 text-sm">Installment #{{ payment.installment_number }}</span>
-                        <div class="text-xs text-gray-500 mt-1">
-                          {{ formatDate(payment.payment_date) }} • {{ getPaymentMethodLabel(payment.payment_method) }}
-                        </div>
-                        <div v-if="payment.reference_no" class="text-xs text-gray-400 mt-1">
-                          Ref: {{ payment.reference_no }}
-                        </div>
-                      </div>
-                      <span class="text-green-600 font-bold text-lg">৳{{ formatNumber(payment.amount) }}</span>
-                    </div>
-                  </div>
-                  
-                  <div v-if="payments.length === 0" class="text-center text-gray-400 text-sm py-4">
-                    No payments made yet
-                  </div>
-                </div>
-
-                <!-- Payment Progress -->
-                <div class="mt-4 mb-4">
-                  <div class="flex justify-between text-xs mb-1">
-                    <span class="text-gray-600">Paid: ৳{{ formatNumber(form.paid_amount) }}</span>
-                    <span class="text-gray-600">Due: ৳{{ formatNumber(totalAmount - form.paid_amount) }}</span>
-                  </div>
-                  <div class="w-full bg-gray-200 rounded-full h-2">
-                    <div class="bg-green-600 rounded-full h-2 transition-all duration-300" :style="{ width: paymentProgress + '%' }"></div>
-                  </div>
-                  <div class="text-right text-xs text-gray-500 mt-1">{{ paymentProgress.toFixed(1) }}% paid</div>
-                </div>
-
-                <!-- Add New Installment Form -->
-                <div v-if="form.paid_amount < totalAmount" class="mt-4 p-4 bg-indigo-50 rounded-xl border border-indigo-200">
-                  <h4 class="text-sm font-bold text-indigo-800 mb-3">
-                    Add Installment #{{ payments.length + 1 }}
-                  </h4>
-                  
-                  <div class="space-y-3">
-                    <div>
-                      <label class="text-xs font-semibold text-indigo-700 block mb-1">Payment Amount (৳)</label>
-                      <div class="relative">
-                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-400">৳</span>
-                        <input 
-                          type="number" 
-                          v-model="newPayment.amount" 
-                          @input="validatePaymentAmount"
-                          class="w-full pl-8 pr-3 py-2 border-2 border-indigo-200 rounded-lg focus:border-indigo-400 outline-none bg-white"
-                          placeholder="0.00"
-                          :max="totalAmount - form.paid_amount"
-                          step="0.01"
-                        >
-                      </div>
-                      <p class="text-xs text-indigo-500 mt-1">Maximum: ৳{{ formatNumber(totalAmount - form.paid_amount) }}</p>
-                    </div>
-
-                    <div>
-                      <label class="text-xs font-semibold text-indigo-700 block mb-1">Payment Date</label>
-                      <input 
-                        type="date" 
-                        v-model="newPayment.date" 
-                        class="w-full px-3 py-2 border-2 border-indigo-200 rounded-lg focus:border-indigo-400 outline-none bg-white"
-                      >
-                    </div>
-
-                    <div>
-                      <label class="text-xs font-semibold text-indigo-700 block mb-1">Payment Method</label>
-                      <select v-model="newPayment.method" class="w-full px-3 py-2 border-2 border-indigo-200 rounded-lg focus:border-indigo-400 outline-none bg-white">
-                        <option value="cash">Cash</option>
-                        <option value="bank_transfer">Bank Transfer</option>
-                        <option value="check">Check</option>
-                        <option value="mobile_banking">Mobile Banking</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label class="text-xs font-semibold text-indigo-700 block mb-1">Reference No (Optional)</label>
-                      <input 
-                        type="text" 
-                        v-model="newPayment.reference_no" 
-                        class="w-full px-3 py-2 border-2 border-indigo-200 rounded-lg focus:border-indigo-400 outline-none bg-white"
-                        placeholder="Check/Transaction number"
-                      >
-                    </div>
-
-                    <button 
-                      @click="addPayment" 
-                      :disabled="!newPayment.amount || newPayment.amount <= 0 || newPayment.amount > (totalAmount - form.paid_amount)"
-                      class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Add Installment #{{ payments.length + 1 }}
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Fully Paid Message -->
-                <div v-if="form.paid_amount >= totalAmount && totalAmount > 0" class="mt-4 p-3 bg-green-100 rounded-lg text-center">
-                  <svg class="w-5 h-5 text-green-600 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span class="text-green-700 font-semibold">Fully Paid!</span>
+                <div v-if="payments.length === 0" class="text-center text-gray-400 text-sm py-4">
+                  No payments made yet
                 </div>
               </div>
+
+              <!-- Payment Progress -->
+              <div class="mt-4 mb-4">
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="text-gray-600">Paid: ৳{{ formatNumber(form.paid_amount) }}</span>
+                  <span class="text-gray-600">Due: ৳{{ formatNumber(remainingBalance) }}</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                  <div class="bg-green-600 rounded-full h-2 transition-all duration-300" :style="{ width: paymentProgress + '%' }"></div>
+                </div>
+                <div class="text-right text-xs text-gray-500 mt-1">{{ paymentProgress.toFixed(1) }}% paid</div>
+              </div>
+
+              <!-- Average Discount and Tax (Edit Mode) -->
+              <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label class="text-xs font-semibold text-gray-500 uppercase">Avg. Discount (%)</label>
+                  <input type="number" v-model="form.average_discount" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-200 outline-none" step="0.1">
+                </div>
+                <div>
+                  <label class="text-xs font-semibold text-gray-500 uppercase">Avg. Tax (%)</label>
+                  <input type="number" v-model="form.average_tax" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-200 outline-none" step="0.1">
+                </div>
+              </div>
+
+              <!-- Add New Installment Form - ALWAYS SHOW when not fully paid -->
+              <div v-if="remainingBalance > 0" class="mt-4 p-4 bg-indigo-50 rounded-xl border border-indigo-200">
+                <h4 class="text-sm font-bold text-indigo-800 mb-3">
+                  Add Installment #{{ payments.length + 1 }}
+                </h4>
+                
+                <div class="space-y-3">
+                  <div>
+                    <label class="text-xs font-semibold text-indigo-700 block mb-1">Payment Amount (৳)</label>
+                    <div class="relative">
+                      <span class="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-400">৳</span>
+                      <input 
+                        type="number" 
+                        v-model="newPayment.amount" 
+                        @input="validatePaymentAmount"
+                        class="w-full pl-8 pr-3 py-2 border-2 border-indigo-200 rounded-lg focus:border-indigo-400 outline-none bg-white"
+                        placeholder="0.00"
+                        :max="remainingBalance"
+                        step="0.01"
+                      >
+                    </div>
+                    <p class="text-xs text-indigo-500 mt-1">Maximum: ৳{{ formatNumber(remainingBalance) }}</p>
+                  </div>
+
+                  <div>
+                    <label class="text-xs font-semibold text-indigo-700 block mb-1">Payment Date</label>
+                    <input 
+                      type="date" 
+                      v-model="newPayment.date" 
+                      class="w-full px-3 py-2 border-2 border-indigo-200 rounded-lg focus:border-indigo-400 outline-none bg-white"
+                    >
+                  </div>
+
+                  <div>
+                    <label class="text-xs font-semibold text-indigo-700 block mb-1">Payment Method</label>
+                    <select v-model="newPayment.method" class="w-full px-3 py-2 border-2 border-indigo-200 rounded-lg focus:border-indigo-400 outline-none bg-white">
+                      <option value="cash">Cash</option>
+                      <option value="bank_transfer">Bank Transfer</option>
+                      <option value="check">Check</option>
+                      <option value="mobile_banking">Mobile Banking</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label class="text-xs font-semibold text-indigo-700 block mb-1">Reference No (Optional)</label>
+                    <input 
+                      type="text" 
+                      v-model="newPayment.reference_no" 
+                      class="w-full px-3 py-2 border-2 border-indigo-200 rounded-lg focus:border-indigo-400 outline-none bg-white"
+                      placeholder="Check/Transaction number"
+                    >
+                  </div>
+
+                  <button 
+                    @click="addPayment" 
+                    :disabled="!newPayment.amount || newPayment.amount <= 0 || newPayment.amount > remainingBalance"
+                    class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Add Installment #{{ payments.length + 1 }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Fully Paid Message -->
+              <div v-if="remainingBalance <= 0 && totalAmount > 0" class="mt-4 p-3 bg-green-100 rounded-lg text-center">
+                <svg class="w-5 h-5 text-green-600 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                <span class="text-green-700 font-semibold">Fully Paid!</span>
+              </div>
+            </div>
 
               <!-- Totals Section -->
               <div class="pt-4 border-t border-gray-200 space-y-2">
@@ -545,52 +557,84 @@ export default {
     const purchaseId = computed(() => route.params.id)
     const purchaseData = ref({})
     
+    // Helper function to format date for input
+    const formatDateForInput = (date) => {
+      if (!date) return new Date().toISOString().split('T')[0]
+      // Handle ISO format: "2026-04-17T00:00:00.000000Z" -> "2026-04-17"
+      return date.split('T')[0]
+    }
+    
     // Form Data
     const form = reactive({
       supplier_id: '',
       warehouse_id: '',
       purchase_date: new Date().toISOString().split('T')[0],
+      status: 'ordered',
       payment_status: 'unpaid',
       paid_amount: 0,
-      status: 'ordered'
+      new_payment_amount: 0,
+      average_discount: 0,
+      average_tax: 0
     })
     
     // Computed Properties
     const subtotal = computed(() => {
       return cart.value.reduce((sum, item) => {
-        return sum + (parseFloat(item.quantity || 0) * parseFloat(item.purchase_price || 0))
+        const qty = parseFloat(item.quantity) || 0
+        const price = parseFloat(item.purchase_price) || 0
+        return sum + (qty * price)
       }, 0)
     })
     
     const totalDiscount = computed(() => {
-      return cart.value.reduce((sum, item) => {
-        const itemSubtotal = parseFloat(item.quantity || 0) * parseFloat(item.purchase_price || 0)
-        const discountAmount = (itemSubtotal * (parseFloat(item.discount) || 0)) / 100
-        return sum + discountAmount
-      }, 0)
+      if (isEditMode.value) {
+        // Calculate from individual items in edit mode
+        return cart.value.reduce((sum, item) => {
+          const qty = parseFloat(item.quantity) || 0
+          const price = parseFloat(item.purchase_price) || 0
+          const discount = parseFloat(item.discount) || 0
+          const itemSubtotal = qty * price
+          const discountAmount = (itemSubtotal * discount) / 100
+          return sum + (isNaN(discountAmount) ? 0 : discountAmount)
+        }, 0)
+      } else {
+        // Use average discount for create mode
+        return (subtotal.value * (parseFloat(form.average_discount) || 0)) / 100
+      }
     })
+    
+    const taxableAmount = computed(() => subtotal.value - totalDiscount.value)
     
     const totalTax = computed(() => {
-      return cart.value.reduce((sum, item) => {
-        const itemSubtotal = parseFloat(item.quantity || 0) * parseFloat(item.purchase_price || 0)
-        const discountAmount = (itemSubtotal * (parseFloat(item.discount) || 0)) / 100
-        const taxableAmount = itemSubtotal - discountAmount
-        const taxAmount = (taxableAmount * (parseFloat(item.tax) || 0)) / 100
-        return sum + taxAmount
-      }, 0)
+      if (isEditMode.value) {
+        // Calculate from individual items in edit mode
+        return cart.value.reduce((sum, item) => {
+          const qty = parseFloat(item.quantity) || 0
+          const price = parseFloat(item.purchase_price) || 0
+          const discount = parseFloat(item.discount) || 0
+          const tax = parseFloat(item.tax) || 0
+          const itemSubtotal = qty * price
+          const discountAmount = (itemSubtotal * discount) / 100
+          const taxableAmount = itemSubtotal - discountAmount
+          const taxAmount = (taxableAmount * tax) / 100
+          return sum + (isNaN(taxAmount) ? 0 : taxAmount)
+        }, 0)
+      } else {
+        // Use average tax for create mode
+        return (taxableAmount.value * (parseFloat(form.average_tax) || 0)) / 100
+      }
     })
     
-    const totalAmount = computed(() => {
-      return subtotal.value - totalDiscount.value + totalTax.value
-    })
+    const totalAmount = computed(() => taxableAmount.value + totalTax.value)
     
     const totalQuantity = computed(() => {
-      return cart.value.reduce((sum, item) => sum + parseFloat(item.quantity || 0), 0)
+      return cart.value.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0)
     })
     
     const paymentProgress = computed(() => {
       if (totalAmount.value > 0) {
-        return (form.paid_amount / totalAmount.value) * 100
+        const progress = (form.paid_amount / totalAmount.value) * 100
+        return isNaN(progress) ? 0 : Math.min(100, progress)
       }
       return 0
     })
@@ -601,14 +645,20 @@ export default {
              cart.value.length > 0
     })
     
+    const remainingBalance = computed(() => {
+      const balance = totalAmount.value - form.paid_amount
+      return isNaN(balance) ? 0 : Math.max(0, balance)
+    })    
     // Methods
     const formatNumber = (value) => {
-      return parseFloat(value || 0).toFixed(2)
+      const num = parseFloat(value || 0)
+      return isNaN(num) ? '0.00' : num.toFixed(2)
     }
     
     const formatDate = (date) => {
       if (!date) return 'N/A'
-      return new Date(date).toLocaleDateString('en-BD')
+      const d = new Date(date)
+      return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString('en-BD')
     }
     
     const getPaymentStatusLabel = (status) => {
@@ -646,12 +696,12 @@ export default {
       const discount = parseFloat(item.discount) || 0
       const tax = parseFloat(item.tax) || 0
       
-      const subtotal = quantity * price
-      const discountAmount = (subtotal * discount) / 100
-      const taxableAmount = subtotal - discountAmount
+      const itemSubtotal = quantity * price
+      const discountAmount = (itemSubtotal * discount) / 100
+      const taxableAmount = itemSubtotal - discountAmount
       const taxAmount = (taxableAmount * tax) / 100
       
-      item.total = subtotal - discountAmount + taxAmount
+      item.total = itemSubtotal - discountAmount + taxAmount
     }
     
     const searchProducts = () => {
@@ -728,13 +778,15 @@ export default {
         const data = response.data.data
         purchaseData.value = data
         
-        // Set form values
+        // Set form values with proper date formatting
         form.supplier_id = data.supplier_id
         form.warehouse_id = data.warehouse_id
-        form.purchase_date = data.purchase_date
+        form.purchase_date = formatDateForInput(data.purchase_date)
         form.status = data.status
         form.payment_status = data.payment_status
         form.paid_amount = parseFloat(data.paid_amount) || 0
+        form.average_discount = data.discount_percent || 0
+        form.average_tax = data.tax_percent || 0
         
         // Load payments
         payments.value = data.payments || []
@@ -860,6 +912,8 @@ export default {
             total_discount: totalDiscount.value,
             total_tax: totalTax.value,
             total_amount: totalAmount.value,
+            discount_percent: form.average_discount,
+            tax_percent: form.average_tax,
             shipping_cost: 0,
             items: cart.value.map(item => ({
               product_id: item.product_id,
@@ -921,6 +975,7 @@ export default {
       }
     })
     
+    // Initialize on mount - single onMounted
     onMounted(async () => {
       await Promise.all([loadSuppliers(), loadWarehouses()])
       
@@ -946,6 +1001,7 @@ export default {
       totalDiscount,
       totalTax,
       totalAmount,
+      remainingBalance,
       totalQuantity,
       paymentProgress,
       canSubmit,
