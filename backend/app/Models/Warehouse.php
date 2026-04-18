@@ -71,14 +71,4 @@ class Warehouse extends Model
     {
         return $this->hasMany(Sale::class);
     }
-
-    public function stockTransfersFrom()
-    {
-        return $this->hasMany(StockTransfer::class, 'from_warehouse_id');
-    }
-
-    public function stockTransfersTo()
-    {
-        return $this->hasMany(StockTransfer::class, 'to_warehouse_id');
-    }
 }

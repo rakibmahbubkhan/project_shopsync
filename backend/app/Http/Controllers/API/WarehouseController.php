@@ -8,6 +8,7 @@ use App\Models\Warehouse;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class WarehouseController extends Controller
 {
@@ -51,7 +52,7 @@ class WarehouseController extends Controller
                 'data' => $warehouses
             ]);
         } catch (\Exception $e) {
-            \Log::error('Warehouse index error: ' . $e->getMessage());
+            Log::error('Warehouse index error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to load warehouses: ' . $e->getMessage()
@@ -86,7 +87,7 @@ class WarehouseController extends Controller
                 'errors' => $e->errors()
             ], 422);
         } catch (\Exception $e) {
-            \Log::error('Warehouse store error: ' . $e->getMessage());
+            Log::error('Warehouse store error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create warehouse: ' . $e->getMessage()

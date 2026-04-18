@@ -1,4 +1,5 @@
 <?php
+// database/seeders/WarehousesTableSeeder.php
 
 namespace Database\Seeders;
 
@@ -11,33 +12,38 @@ class WarehousesTableSeeder extends Seeder
     {
         $warehouses = [
             [
+                'code' => 'WH-0001',
                 'name' => 'Main Warehouse',
-                'code' => 'WH001',
-                'address' => '1000 Industrial Pkwy, City',
+                'address' => '123 Industrial Area, Sector 1, Dhaka',
+                'capacity' => 10000,
                 'is_active' => true,
             ],
             [
-                'name' => 'North Branch',
-                'code' => 'WH002',
-                'address' => '200 North St, North City',
+                'code' => 'WH-0002',
+                'name' => 'Chittagong Warehouse',
+                'address' => '45 Port Road, Chittagong',
+                'capacity' => 8000,
                 'is_active' => true,
             ],
             [
-                'name' => 'South Warehouse',
-                'code' => 'WH003',
-                'address' => '300 South Ave, South Town',
+                'code' => 'WH-0003',
+                'name' => 'Rajshahi Warehouse',
+                'address' => '78 Station Road, Rajshahi',
+                'capacity' => 5000,
                 'is_active' => true,
             ],
             [
-                'name' => 'East Distribution Center',
-                'code' => 'WH004',
-                'address' => '400 East Blvd, East City',
-                'is_active' => false,
+                'code' => 'WH-0004',
+                'name' => 'Khulna Warehouse',
+                'address' => '12 KDA Avenue, Khulna',
+                'capacity' => 4000,
+                'is_active' => true,
             ],
             [
-                'name' => 'West Storage',
-                'code' => 'WH005',
-                'address' => '500 West Rd, West Village',
+                'code' => 'WH-0005',
+                'name' => 'Sylhet Warehouse',
+                'address' => '56 Zindabazar, Sylhet',
+                'capacity' => 3500,
                 'is_active' => true,
             ],
         ];
@@ -45,5 +51,8 @@ class WarehousesTableSeeder extends Seeder
         foreach ($warehouses as $warehouse) {
             Warehouse::create($warehouse);
         }
+
+        $this->command->info('Warehouses seeded successfully!');
+        $this->command->info('Total warehouses: ' . Warehouse::count());
     }
-}   
+}

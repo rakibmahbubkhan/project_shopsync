@@ -30,8 +30,11 @@ class DatabaseSeeder extends Seeder
             // Inventory locations
             WarehousesTableSeeder::class,
             
+            
             // Products
             ProductsTableSeeder::class,
+
+            ProductWarehouseTableSeeder::class,
             
             // Accounting
             AccountsTableSeeder::class,
