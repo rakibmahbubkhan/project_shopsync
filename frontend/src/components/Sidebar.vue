@@ -42,7 +42,7 @@
         <button 
           @click="toggleSidebar"
           class="absolute -right-3 top-1/2 -translate-y-1/2 w-7 h-7 bg-white/10 backdrop-blur-xl rounded-full border border-white/20 flex items-center justify-center hover:bg-white/20 transition-all group shadow-xl hover:scale-110 hover:border-white/40"
-          :class="{ 'rotate-180': isCollapsed }"
+          :class="{ 'rotate-180': isCollapsed }" style="background-color: red;"
         >
           <svg class="w-3.5 h-3.5 text-white/70 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path>
