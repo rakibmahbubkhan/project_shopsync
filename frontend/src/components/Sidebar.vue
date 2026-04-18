@@ -38,11 +38,11 @@
           </h2>
         </div>
 
-        <!-- Collapse Toggle Button - Modern Design -->
+        <!-- Collapse Toggle Button -->
         <button 
           @click="toggleSidebar"
           class="absolute -right-3 top-1/2 -translate-y-1/2 w-7 h-7 bg-white/10 backdrop-blur-xl rounded-full border border-white/20 flex items-center justify-center hover:bg-white/20 transition-all group shadow-xl hover:scale-110 hover:border-white/40"
-          :class="{ 'rotate-180': isCollapsed }" style="background-color: red;"
+          :class="{ 'rotate-180': isCollapsed }"
         >
           <svg class="w-3.5 h-3.5 text-white/70 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path>
@@ -96,12 +96,31 @@
             <span v-else class="tooltip">Sales History</span>
           </router-link>
 
-                  <!-- Add this under Operations section -->
-        <router-link to="/purchases" class="nav-item group" active-class="active" :class="{ 'justify-center': isCollapsed }">
-          <span class="icon">📋</span>
-          <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm">Purchase List</span>
-          <span v-else class="tooltip">Purchase List</span>
-        </router-link>
+          <router-link to="/purchases" class="nav-item group" active-class="active" :class="{ 'justify-center': isCollapsed }">
+            <span class="icon">📋</span>
+            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm">Purchase List</span>
+            <span v-else class="tooltip">Purchase List</span>
+          </router-link>
+
+          <router-link to="/purchases/create" class="nav-item group" active-class="active" :class="{ 'justify-center': isCollapsed }">
+            <span class="icon">📦</span>
+            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm">New Purchase</span>
+            <span v-else class="tooltip">New Purchase</span>
+          </router-link>
+
+          <!-- Suppliers Link -->
+          <router-link to="/suppliers" class="nav-item group" active-class="active" :class="{ 'justify-center': isCollapsed }">
+            <span class="icon">🏭</span>
+            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm">Suppliers</span>
+            <span v-else class="tooltip">Suppliers</span>
+          </router-link>
+
+          <!-- Warehouses Link -->
+          <router-link to="/warehouses" class="nav-item group" active-class="active" :class="{ 'justify-center': isCollapsed }">
+            <span class="icon">🏪</span>
+            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm">Warehouses</span>
+            <span v-else class="tooltip">Warehouses</span>
+          </router-link>
 
           <router-link to="/inventory/transfer" class="nav-item group" active-class="active" :class="{ 'justify-center': isCollapsed }">
             <span class="icon">🚚</span>
@@ -136,12 +155,11 @@
         </div>
       </nav>
       
-      <!-- User Profile Section - Modern Design -->
+      <!-- User Profile Section -->
       <div class="relative mt-auto border-t border-white/10 bg-gradient-to-t from-black/20 to-transparent backdrop-blur-xl">
         <!-- Collapsed Profile View -->
         <div v-if="isCollapsed" class="p-4 flex justify-center">
           <div class="relative group">
-            <!-- Avatar with glow effect -->
             <div class="relative">
               <div class="absolute inset-0 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl blur-md opacity-50 group-hover:opacity-75 transition-opacity"></div>
               <div class="relative w-11 h-11 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 text-white rounded-xl flex items-center justify-center font-bold text-xl shadow-2xl">
@@ -150,7 +168,6 @@
               <div class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-slate-900"></div>
             </div>
             
-            <!-- Modern Tooltip -->
             <div class="absolute left-full ml-3 bottom-0 w-48 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-50">
               <div class="relative bg-white/10 backdrop-blur-xl rounded-xl p-3 border border-white/20 shadow-2xl">
                 <div class="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-white/10 backdrop-blur-xl rotate-45 border-l border-t border-white/20"></div>
@@ -164,7 +181,6 @@
         <!-- Expanded Profile View -->
         <div v-else class="p-4">
           <div class="flex items-center gap-3">
-            <!-- Avatar with glow -->
             <div class="relative group">
               <div class="absolute inset-0 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl blur-md opacity-50 group-hover:opacity-75 transition-opacity"></div>
               <div class="relative w-12 h-12 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 text-white rounded-xl flex items-center justify-center font-bold text-xl shadow-2xl">
@@ -185,9 +201,8 @@
           </div>
         </div>
         
-        <!-- Logout Button - Modern Design -->
+        <!-- Logout Button -->
         <button @click="handleLogout" class="logout-btn group" :class="{ 'justify-center': isCollapsed }">
-          <!-- Animated background -->
           <div class="absolute inset-0 bg-gradient-to-r from-red-500/0 to-red-500/0 group-hover:from-red-500/20 group-hover:to-orange-500/20 transition-all duration-500"></div>
           
           <span class="relative text-lg transform group-hover:scale-110 transition-transform">🚪</span>
@@ -198,11 +213,6 @@
       </div>
     </div>
   </aside>
-
-  <!-- Main Content Adjuster with smooth transition -->
-  <!-- <div class="transition-all duration-500 min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30" :class="isCollapsed ? 'ml-20' : 'ml-72'">
-    <router-view></router-view>
-  </div> -->
 </template>
 
 <script setup>
@@ -211,13 +221,11 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import { useSidebarStore } from '@/stores/sidebarStore';
 
-
-const emit = defineEmits(['toggle']); // Add this line
+const emit = defineEmits(['toggle']);
 
 const router = useRouter();
 const auth = useAuthStore();
 const sidebarStore = useSidebarStore();
-
 
 // Sidebar collapse state
 const isCollapsed = computed(() => sidebarStore.isCollapsed);
@@ -247,7 +255,6 @@ const handleLogout = async () => {
 </script>
 
 <style scoped>
-
 @reference "../assets/main.css"; 
 
 /* Navigation item styling - Modern Glass Effect */
@@ -329,7 +336,7 @@ const handleLogout = async () => {
   background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.1) 100%);
 }
 
-/* Custom scrollbar - Matching dashboard style */
+/* Custom scrollbar */
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) rgba(255, 255, 255, 0.05);

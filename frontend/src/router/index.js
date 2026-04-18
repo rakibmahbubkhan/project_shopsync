@@ -14,7 +14,7 @@ const routes = [
       { path: 'users', name: 'users', component: () => import('@/views/users/UserManagement.vue') },
 
       // Products & Inventory
-      { path: 'products', name: 'products', component: () => import('@/views/products/ProductList.vue') },
+      { path: 'products', name: 'products', component: () => import('@/views/Products/ProductList.vue') },
 
       // Sales & Returns
       { path: 'sales', name: 'sales', component: () => import('@/views/sales/SalesListView.vue') },
@@ -25,6 +25,9 @@ const routes = [
       { path: 'purchases', name: 'purchases', component: () => import('@/views/purchases/PurchaseList.vue') },
       { path: 'purchases/create', name: 'purchase-create', component: () => import('@/views/purchases/PurchaseCreate.vue') },
       { path: 'purchases/:id/edit', name: 'purchase-edit', component: () => import('@/views/purchases/PurchaseCreate.vue') },
+
+      { path: 'suppliers', name: 'suppliers', component: () => import('@/views/suppliers/SupplierList.vue')},
+      { path: 'warehouses', name: 'warehouses', component: () => import('@/views/warehouses/WarehouseList.vue')},
 
       // Stock Operations
       { path: 'inventory/transfer', name: 'stock-transfer', component: () => import('@/views/inventory/TransferCreate.vue') },
