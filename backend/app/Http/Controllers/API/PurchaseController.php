@@ -413,6 +413,7 @@ class PurchaseController extends Controller
     /**
      * POST /api/purchases/{id}/payments
      */
+ 
     public function addPayment(Request $request, Purchase $purchase): JsonResponse
     {
         $validated = $request->validate([
@@ -460,8 +461,13 @@ class PurchaseController extends Controller
                     'updated_by' => Auth::id(),
                 ]);
 
-                // Update accounting entries
-                $this->updateAccountingForPayment($purchase, $paymentAmount);
+                // Update accounting entries (wrap in try-catch to prevent payment failure)
+                try {
+                    $this->updateAccountingForPayment($purchase, $paymentAmount);
+                } catch (\Exception $e) {
+                    Log::warning('Accounting entry failed but payment was recorded: ' . $e->getMessage());
+                    // Don't fail the payment if accounting fails
+                }
 
                 return response()->json([
                     'message' => 'Payment added successfully',

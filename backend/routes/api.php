@@ -147,7 +147,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // 4. Purchases & Suppliers
     Route::apiResource('suppliers', SupplierController::class);
-    Route::apiResource('purchases', PurchaseController::class);
+    Route::apiResource('purchases', PurchaseController::class); 
+
+    Route::post('purchases/{purchase}/receive', [PurchaseController::class, 'receive']);
+    Route::post('purchases/{purchase}/payments', [PurchaseController::class, 'addPayment']);
+    Route::get('purchases/{purchase}/items', [PurchaseController::class, 'getItems']);
 
     // 5. Stock Operations
     Route::apiResource('stock-transfers', StockTransferController::class);

@@ -1,4 +1,5 @@
 <?php
+// app/Models/JournalEntry.php
 
 namespace App\Models;
 
@@ -8,17 +9,24 @@ class JournalEntry extends Model
 {
     protected $fillable = [
         'entry_date',
+        'description',
         'reference_type',
         'reference_id',
-        'description',
-        'user_id'
+        'created_by',
+        'notes'
     ];
 
-    /**
-     * Get the financial lines (debits/credits) for this entry.
-     */
+    protected $casts = [
+        'entry_date' => 'date'
+    ];
+
     public function lines()
     {
         return $this->hasMany(JournalEntryLine::class);
+    }
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 }

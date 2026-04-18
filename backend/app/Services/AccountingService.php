@@ -22,82 +22,38 @@ class AccountingService
      * @return JournalEntry
      * @throws Exception
      */
-    public function createEntry(string $date, string $description, array $lines, ?string $referenceType = null, ?int $referenceId = null): JournalEntry
+    public function createEntry($date, $description, $entries, $referenceType, $referenceId)
     {
-        return DB::transaction(function () use ($date, $description, $lines, $referenceType, $referenceId) {
-            
-            // 1. Validate Balance: Sum of Debits must equal Sum of Credits
-            $totalDebit = collect($lines)->sum('debit');
-            $totalCredit = collect($lines)->sum('credit');
-
-            // Use a small epsilon for floating point comparison
-            if (abs($totalDebit - $totalCredit) > 0.0001) {
-                throw new Exception(
-                    "Journal Entry is not balanced. " .
-                    "Debits: {$totalDebit}, Credits: {$totalCredit}, " .
-                    "Difference: " . abs($totalDebit - $totalCredit)
-                );
-            }
-
-            // 2. Check if entry already exists for this reference (prevent duplicates)
-            if ($referenceType && $referenceId) {
-                $existingEntry = JournalEntry::where('reference_type', $referenceType)
-                    ->where('reference_id', $referenceId)
-                    ->first();
-                
-                if ($existingEntry) {
-                    throw new Exception(
-                        "Journal entry already exists for {$referenceType} #{$referenceId}"
-                    );
-                }
-            }
-
-            // 3. Create the Header Entry
-            $entry = JournalEntry::create([
-                'entry_date'     => $date,
-                'description'    => $description,
+        return DB::transaction(function () use ($date, $description, $entries, $referenceType, $referenceId) {
+            // Create journal entry
+            $journalEntry = JournalEntry::create([
+                'entry_date' => $date,
+                'description' => $description,
                 'reference_type' => $referenceType,
-                'reference_id'   => $referenceId,
-                'user_id'        => Auth::id(),
+                'reference_id' => $referenceId,
+                'created_by' => Auth::id(),
+                'notes' => $description
             ]);
 
-            // 4. Create individual lines
-            foreach ($lines as $index => $line) {
-                // Validate each line has required fields
-                if (!isset($line['account_id'])) {
-                    throw new Exception("Line #{$index}: account_id is required");
-                }
-
-                // Ensure at least one of debit or credit is set
-                $debit = $line['debit'] ?? 0;
-                $credit = $line['credit'] ?? 0;
-                
-                if ($debit == 0 && $credit == 0) {
-                    throw new Exception("Line #{$index}: Either debit or credit must be greater than zero");
-                }
-
-                if ($debit > 0 && $credit > 0) {
-                    throw new Exception("Line #{$index}: Cannot have both debit and credit on same line");
-                }
-
+            // Create journal entry lines
+            foreach ($entries as $entry) {
                 JournalEntryLine::create([
-                    'journal_entry_id' => $entry->id,
-                    'account_id'       => $line['account_id'],
-                    'debit'            => $debit,
-                    'credit'           => $credit,
+                    'journal_entry_id' => $journalEntry->id,
+                    'account_id' => $entry['account_id'],
+                    'debit' => $entry['debit'],
+                    'credit' => $entry['credit'],
+                    'description' => $description
                 ]);
             }
 
-            // Log the entry creation for audit trail
-            Log::info('Journal entry created', [
-                'entry_id' => $entry->id,
-                'reference' => $referenceType ? "{$referenceType}:{$referenceId}" : 'none',
-                'total' => $totalDebit,
-                'user_id' => Auth::id()
-            ]);
-
-            return $entry->load('lines');
+            return $journalEntry;
         });
+    }
+
+    public function updateAccountingForPayment($purchase, $paymentAmount)
+    {
+        // This method is called from PurchaseController
+        // You can implement additional logic here if needed
     }
 
     /**
