@@ -18,14 +18,14 @@
       <!-- LEFT SIDE: Products Section -->
       <div class="flex-1 flex flex-col bg-gray-50 overflow-hidden">
         
-        <!-- Category Tabs - Horizontal Scroll on Mobile -->
+        <!-- Category Tabs -->
         <div class="bg-white border-b border-gray-200 px-2 sm:px-4">
           <div class="flex gap-1 overflow-x-auto whitespace-nowrap scrollbar-thin">
             <button
               v-for="category in categories"
               :key="category.id"
               @click="selectCategory(category.id)"
-              class="px-3 sm:px-6 py-2 sm:py-3 text-xs sm:text-sm font-medium transition-colors"
+              class="px-3 sm:px-6 py-2 sm:py-3 text-xs sm:text-sm font-medium transition-colors flex-shrink-0"
               :class="selectedCategory === category.id 
                 ? 'text-indigo-600 border-b-2 border-indigo-600' 
                 : 'text-gray-600 hover:text-gray-900'"
@@ -36,11 +36,11 @@
         </div>
         
         <!-- Search and Filter Bar -->
-        <div class="p-3 sm:p-4 space-y-2 sm:space-y-3">
+        <div class="p-3 sm:p-4 space-y-2 sm:space-y-3 flex-shrink-0">
           <div class="relative">
             <input
               v-model="search"
-              @input="handleSearchInput"
+              @input="debouncedSearch"
               type="text"
               placeholder="Search By Name or SKU..."
               class="w-full pl-10 pr-20 sm:pr-24 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm"
@@ -57,21 +57,18 @@
           </div>
           
           <!-- Brand Filter -->
-          <div class="flex gap-2">
-            <select 
-              v-model="selectedBrand"
-              @change="filterProducts"
-              class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500 text-sm bg-white"
-            >
-              <option value="">All Brands</option>
-              <option v-for="brand in brands" :key="brand.id" :value="brand.id">
-                {{ brand.name }}
-              </option>
-            </select>
-          </div>
+          <select 
+            v-model="selectedBrand"
+            @change="filterProducts"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500 text-sm bg-white"
+          >
+            <option value="">All Brands</option>
+            <option v-for="brand in brands" :key="brand.id" :value="brand.id">
+              {{ brand.name }}
+            </option>
+          </select>
         </div>
-        
-        <!-- Recent Sold Products Section - Horizontal Scroll -->
+
         <div class="px-3 sm:px-4 mb-2 flex-shrink-0">
           <div class="flex items-center justify-between mb-2">
             <h3 class="text-xs sm:text-sm font-semibold text-gray-700">Recently Sold</h3>
@@ -114,20 +111,35 @@
           </div>
         </div>
         
-        <!-- Products Grid -->
-        <div class="flex-1 overflow-y-auto px-3 sm:px-4 pb-4">
-          <div v-if="filteredProducts.length > 0" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3">
+        <!-- Products Grid with Infinite Scroll -->
+        <div 
+          class="flex-1 overflow-y-auto px-3 sm:px-4 pb-4" 
+          ref="productsContainer" 
+          @scroll="handleScroll"
+        >
+          <!-- Loading skeleton -->
+          <div v-if="productsLoading && displayedProducts.length === 0" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3">
+            <div v-for="n in 12" :key="n" class="bg-white border border-gray-200 rounded-lg p-2 sm:p-3 animate-pulse">
+              <div class="w-full h-16 sm:h-20 bg-gray-200 rounded-lg mb-2"></div>
+              <div class="h-3 bg-gray-200 rounded mb-2"></div>
+              <div class="h-4 bg-gray-200 rounded w-2/3"></div>
+            </div>
+          </div>
+          
+          <!-- Products Grid -->
+          <div v-else-if="displayedProducts.length > 0" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3">
             <div
-              v-for="product in filteredProducts"
+              v-for="product in displayedProducts"
               :key="product.id"
               @click="addToCart(product)"
               class="bg-white border border-gray-200 rounded-lg p-2 sm:p-3 hover:shadow-lg hover:border-indigo-300 cursor-pointer transition-all"
             >
               <div class="w-full h-16 sm:h-20 bg-gray-100 rounded-lg mb-2 flex items-center justify-center overflow-hidden">
                 <img 
-                  v-if="product.image" 
-                  :src="product.image" 
+                  v-if="product.thumbnail_url" 
+                  :src="product.thumbnail_url" 
                   :alt="product.name"
+                  loading="lazy"
                   class="w-full h-full object-cover"
                 />
                 <svg v-else class="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -139,31 +151,29 @@
                 <p class="text-indigo-600 font-bold text-xs sm:text-sm">${{ product.selling_price }}</p>
                 <p class="text-xs text-gray-500">{{ getUnitName(product.unit) }}</p>
               </div>
-              <p class="text-xs text-gray-500 mt-1">Stock: {{ product.stock_quantity || product.stock || 0 }}</p>
             </div>
           </div>
           
-          <!-- Loading/Empty State -->
-          <div v-else-if="productsLoading" class="flex items-center justify-center h-64">
-            <svg class="animate-spin h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <!-- Loading more indicator -->
+          <div v-if="loadingMore" class="flex justify-center py-4">
+            <svg class="animate-spin h-6 w-6 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
           </div>
           
-          <div v-else class="flex flex-col items-center justify-center h-64 text-center">
+          <div v-else-if="!productsLoading && displayedProducts.length === 0" class="flex flex-col items-center justify-center h-64 text-center">
             <svg class="w-16 h-16 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
             </svg>
             <p class="text-gray-500">No products found</p>
-            <p class="text-xs text-gray-400">Try searching with a different keyword</p>
           </div>
         </div>
         
       </div>
       
-      <!-- RIGHT SIDE: Cart Section - Full width on mobile, fixed width on desktop -->
-      <div class="w-full lg:w-140 bg-white border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col shadow-lg mt-4 lg:mt-2">
+      <!-- RIGHT SIDE: Cart Section -->
+      <div class="w-full lg:w-96 bg-white border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col shadow-lg mt-4 lg:mt-0">
         
         <!-- Cart Header -->
         <div class="p-3 sm:p-4 border-b border-gray-200 flex-shrink-0">
@@ -198,7 +208,7 @@
           </div>
         </div>
         
-        <!-- Cart Items Table - Scrollable with more space -->
+        <!-- Cart Items -->
         <div class="flex-1 overflow-y-auto min-h-0">
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
@@ -224,10 +234,10 @@
                    </td>
                   <td class="p-2 sm:p-3 text-center text-gray-600 hidden sm:table-cell">
                     {{ getUnitName(item.unit) }}
-                  </td>
+                   </td>
                   <td class="p-2 sm:p-3 text-center text-gray-600 hidden md:table-cell">
                     ${{ item.selling_price }}
-                  </td>
+                   </td>
                   <td class="p-2 sm:p-3">
                     <div class="flex items-center justify-center gap-1 sm:gap-2">
                       <button
@@ -339,7 +349,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import api from "@/api/axios";
 
 // Payment Methods
@@ -353,7 +363,6 @@ const paymentMethods = [
 // State
 const search = ref("");
 const products = ref([]);
-const allProducts = ref([]);
 const recentProducts = ref([]);
 const cart = ref([]);
 const customers = ref([]);
@@ -369,14 +378,21 @@ const paymentMethod = ref('cash');
 const referenceNumber = ref("");
 const loading = ref(false);
 const productsLoading = ref(false);
+const loadingMore = ref(false);
 const recentProductsLoading = ref(false);
 const discount = ref(0);
 
+// Pagination
+const currentPage = ref(1);
+const hasMorePages = ref(true);
+const productsContainer = ref(null);
 let searchTimeout = null;
+let scrollTimeout = null;
 
-// Current Date Time
-const currentDateTime = computed(() => {
-  return new Date().toLocaleString('en-US', { 
+// Current Date Time (updates every minute)
+const currentDateTime = ref("");
+const updateDateTime = () => {
+  currentDateTime.value = new Date().toLocaleString('en-US', { 
     hour: 'numeric', 
     minute: '2-digit',
     hour12: true,
@@ -384,30 +400,10 @@ const currentDateTime = computed(() => {
     day: 'numeric',
     year: 'numeric'
   });
-});
+};
 
-// Filtered products based on search, category, and brand
-const filteredProducts = computed(() => {
-  let filtered = allProducts.value;
-  
-  if (search.value) {
-    const searchTerm = search.value.toLowerCase();
-    filtered = filtered.filter(p => 
-      p.name.toLowerCase().includes(searchTerm) || 
-      (p.sku && p.sku.toLowerCase().includes(searchTerm))
-    );
-  }
-  
-  if (selectedCategory.value) {
-    filtered = filtered.filter(p => p.category_id === selectedCategory.value);
-  }
-  
-  if (selectedBrand.value) {
-    filtered = filtered.filter(p => p.brand_id === parseInt(selectedBrand.value));
-  }
-  
-  return filtered;
-});
+// Displayed products
+const displayedProducts = computed(() => products.value);
 
 // Helper function to get unit name
 const getUnitName = (unit) => {
@@ -439,46 +435,7 @@ const extractDataFromResponse = (response) => {
   return [];
 };
 
-// Load categories
-const loadCategories = async () => {
-  try {
-    const res = await api.get('/categories');
-    let cats = extractDataFromResponse(res.data);
-    categories.value = [{ id: null, name: 'All' }, ...(cats || [])];
-    selectedCategory.value = null;
-  } catch (error) {
-    console.error('Failed to load categories:', error);
-    categories.value = [{ id: null, name: 'All' }];
-  }
-};
-
-// Load brands
-const loadBrands = async () => {
-  try {
-    const res = await api.get('/brands');
-    brands.value = extractDataFromResponse(res.data);
-  } catch (error) {
-    console.error('Failed to load brands:', error);
-    brands.value = [];
-  }
-};
-
-// Load all products
-const loadAllProducts = async () => {
-  productsLoading.value = true;
-  try {
-    const res = await api.get('/products', { params: { per_page: 100 } });
-    allProducts.value = extractDataFromResponse(res.data);
-    products.value = allProducts.value;
-  } catch (error) {
-    console.error('Failed to load products:', error);
-    allProducts.value = [];
-  } finally {
-    productsLoading.value = false;
-  }
-};
-
-// Load recent sold products - with fallback to regular products if endpoint doesn't exist
+// Load recent sold products
 const loadRecentProducts = async () => {
   recentProductsLoading.value = true;
   try {
@@ -486,8 +443,8 @@ const loadRecentProducts = async () => {
     recentProducts.value = extractDataFromResponse(res.data);
   } catch (error) {
     console.warn('Recent products endpoint not available, using fallback');
-    // Fallback: Use first 10 products from all products
-    recentProducts.value = allProducts.value.slice(0, 10);
+    // Fallback: Use first 10 products from loaded products
+    recentProducts.value = products.value.slice(0, 10);
   } finally {
     recentProductsLoading.value = false;
   }
@@ -498,22 +455,149 @@ const refreshRecentProducts = () => {
   loadRecentProducts();
 };
 
-// Handle search input
-const handleSearchInput = () => {
-  clearTimeout(searchTimeout);
-  searchTimeout = setTimeout(() => {
-    // Search is handled by computed property
-  }, 300);
+// Load products with pagination
+const loadProducts = async (reset = false) => {
+  if (reset) {
+    currentPage.value = 1;
+    products.value = [];
+    hasMorePages.value = true;
+  }
+  
+  if (!hasMorePages.value) return;
+  
+  const isLoading = reset ? productsLoading : loadingMore;
+  if (isLoading.value) return;
+  
+  if (reset) {
+    productsLoading.value = true;
+  } else {
+    loadingMore.value = true;
+  }
+  
+  try {
+    const params = {
+      page: currentPage.value,
+      per_page: 20,
+    };
+    
+    if (search.value) {
+      params.search = search.value;
+    }
+    
+    if (selectedCategory.value) {
+      params.category_id = selectedCategory.value;
+    }
+    
+    if (selectedBrand.value) {
+      params.brand_id = selectedBrand.value;
+    }
+    
+    const res = await api.get('/products', { params });
+    const newProducts = res.data?.data || [];
+    
+    if (reset) {
+      products.value = newProducts;
+    } else {
+      products.value = [...products.value, ...newProducts];
+    }
+    
+    hasMorePages.value = newProducts.length === 20;
+    currentPage.value++;
+    
+  } catch (error) {
+    console.error('Failed to load products:', error);
+  } finally {
+    productsLoading.value = false;
+    loadingMore.value = false;
+  }
 };
 
-// Filter products
+// Handle scroll for infinite loading
+const handleScroll = () => {
+  if (!productsContainer.value) return;
+  
+  clearTimeout(scrollTimeout);
+  scrollTimeout = setTimeout(() => {
+    const { scrollTop, scrollHeight, clientHeight } = productsContainer.value;
+    if (scrollTop + clientHeight >= scrollHeight - 200 && hasMorePages.value && !loadingMore.value && !productsLoading.value) {
+      loadProducts(false);
+    }
+  }, 100);
+};
+
+// Debounced search
+const debouncedSearch = () => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    loadProducts(true);
+    // Also refresh recent products when searching
+    loadRecentProducts();
+  }, 500);
+};
+
+// Filter products (reset and reload)
 const filterProducts = () => {
-  // Computed property handles this
+  loadProducts(true);
 };
 
 // Select category
 const selectCategory = (categoryId) => {
   selectedCategory.value = categoryId;
+  loadProducts(true);
+};
+
+// Load initial data (one consolidated request)
+const loadInitialData = async () => {
+  try {
+    // Try to get all data from consolidated endpoint
+    const posInitRes = await api.get('/pos/init').catch(() => null);
+    
+    if (posInitRes?.data) {
+      categories.value = [{ id: null, name: 'All' }, ...(posInitRes.data.categories || [])];
+      brands.value = posInitRes.data.brands || [];
+      customers.value = posInitRes.data.customers || [];
+      warehouses.value = posInitRes.data.warehouses || [];
+    } else {
+      // Fallback to individual requests
+      await Promise.all([
+        api.get('/categories').then(res => {
+          let cats = res.data?.data || res.data || [];
+          categories.value = [{ id: null, name: 'All' }, ...cats];
+        }).catch(() => {}),
+        api.get('/brands').then(res => {
+          brands.value = res.data?.data || res.data || [];
+        }).catch(() => {}),
+        api.get('/customers').then(res => {
+          customers.value = res.data?.data || res.data || [];
+        }).catch(() => {}),
+        api.get('/warehouses').then(res => {
+          warehouses.value = res.data?.data || res.data || [];
+        }).catch(() => {})
+      ]);
+    }
+    
+    selectedCategory.value = null;
+    
+    if (customers.value.length > 0) {
+      selectedCustomer.value = customers.value[0].id;
+    }
+    if (warehouses.value.length > 0) {
+      selectedWarehouse.value = warehouses.value[0].id;
+    }
+    
+    // Load products
+    await loadProducts(true);
+    
+    // Load recent products after products are loaded
+    await loadRecentProducts();
+    
+  } catch (error) {
+    console.error('Initialization failed:', error);
+    categories.value = [{ id: null, name: 'All' }];
+    customers.value = [];
+    warehouses.value = [];
+    brands.value = [];
+  }
 };
 
 // Scan barcode
@@ -645,6 +729,7 @@ const checkout = async () => {
     const res = await api.post('/sales', payload);
     
     if (res.data?.id) {
+      // Refresh recent products after successful sale
       await loadRecentProducts();
       
       const shouldPrint = confirm('Sale completed successfully!\n\nWould you like to print the receipt?');
@@ -657,6 +742,9 @@ const checkout = async () => {
     search.value = "";
     referenceNumber.value = "";
     discount.value = 0;
+    
+    // Refresh products to update stock
+    await loadProducts(true);
     
     alert("Transaction completed successfully!");
     
@@ -672,43 +760,16 @@ const checkout = async () => {
   }
 };
 
-// Load initial data
-const loadInitialData = async () => {
-  try {
-    await Promise.all([
-      loadCategories(),
-      loadBrands(),
-      loadAllProducts(),
-      api.get('/customers').catch(() => ({ data: [] })),
-      api.get('/warehouses').catch(() => ({ data: [] }))
-    ]);
-    
-    // Load recent products after all products are loaded
-    await loadRecentProducts();
-    
-    const [customersRes, warehousesRes] = await Promise.all([
-      api.get('/customers').catch(() => ({ data: [] })),
-      api.get('/warehouses').catch(() => ({ data: [] }))
-    ]);
-    
-    customers.value = extractDataFromResponse(customersRes.data);
-    warehouses.value = extractDataFromResponse(warehousesRes.data);
-    
-    if (customers.value.length > 0) {
-      selectedCustomer.value = customers.value[0].id;
-    }
-    if (warehouses.value.length > 0) {
-      selectedWarehouse.value = warehouses.value[0].id;
-    }
-  } catch (error) {
-    console.error('Initialization failed:', error);
-    customers.value = [];
-    warehouses.value = [];
-  }
-};
-
 onMounted(() => {
+  updateDateTime();
+  const interval = setInterval(updateDateTime, 60000);
   loadInitialData();
+  
+  onBeforeUnmount(() => {
+    clearInterval(interval);
+    clearTimeout(searchTimeout);
+    clearTimeout(scrollTimeout);
+  });
 });
 </script>
 
@@ -736,17 +797,24 @@ onMounted(() => {
   background: #94a3b8;
 }
 
-/* Hide scrollbar for cleaner look on mobile */
-@media (max-width: 640px) {
-  .overflow-x-auto {
-    scrollbar-width: thin;
-  }
-}
-
-/* Sticky header for cart table */
+/* Sticky header */
 .sticky {
   position: sticky;
   top: 0;
   z-index: 10;
+}
+
+/* Skeleton animation */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 </style>

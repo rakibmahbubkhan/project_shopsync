@@ -199,11 +199,21 @@ class ProductController extends Controller
     /**
      * Clear all product-related caches
      */
+    /**
+ * Clear all product-related caches
+ */
     private function clearProductCache()
     {
-        Cache::flush(); // Or use more specific cache clearing
-        // Cache::forget('products_*');
-        // Cache::forget('low_stock_products');
-        // Cache::forget('product_form_data');
+        // Clear only product-related cache keys instead of full flush
+        Cache::forget('products_*');
+        Cache::forget('low_stock_products');
+        Cache::forget('product_form_data');
+        
+        // If using cache tags (Redis/Memcached)
+        if (method_exists(Cache::store(), 'tags')) {
+            Cache::tags(['products'])->flush();
+        }
     }
+
+    
 }

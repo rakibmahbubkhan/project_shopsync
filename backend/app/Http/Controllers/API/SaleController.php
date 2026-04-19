@@ -602,14 +602,26 @@ public function receipt(Sale $sale)
         $limit = $request->get('limit', 10);
         
         $recentProducts = SaleItem::with('product')
-            ->select('product_id', DB::raw('MAX(created_at) as last_sold'))
+            ->select('product_id', \DB::raw('MAX(created_at) as last_sold'))
             ->groupBy('product_id')
             ->orderBy('last_sold', 'desc')
             ->limit($limit)
             ->get()
             ->map(function($item) {
-                return $item->product;
-            });
+                $product = $item->product;
+                if ($product) {
+                    return [
+                        'id' => $product->id,
+                        'name' => $product->name,
+                        'selling_price' => $product->selling_price,
+                        'image' => $product->image,
+                        'unit' => $product->unit,
+                        'stock_quantity' => $product->stock_quantity
+                    ];
+                }
+                return null;
+            })
+            ->filter();
         
         return response()->json([
             'success' => true,

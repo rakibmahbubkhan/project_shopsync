@@ -143,6 +143,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // 3. Sales & POS
     Route::get('sales/{sale}/receipt', [SaleController::class, 'receipt']);
     Route::apiResource('sales', SaleController::class);
+    Route::get('/sales/recent-products', [SaleController::class, 'recentProducts']);
 
     // 4. Purchases & Suppliers
     Route::apiResource('suppliers', SupplierController::class);
@@ -175,6 +176,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('warehouses', WarehouseController::class);
 
     Route::get('/sales/recent-products', [SaleController::class, 'recentProducts']);
+
+
+    // Add this route inside the auth:sanctum group
+    Route::get('/pos/init', function() {
+        return response()->json([
+            'categories' => \App\Models\Category::select('id', 'name')->get(),
+            'brands' => \App\Models\Brand::select('id', 'name')->get(),
+            'customers' => \App\Models\Customer::select('id', 'name')->get(),
+            'warehouses' => \App\Models\Warehouse::select('id', 'name')->get(),
+        ]);
+    });
 
 
 
