@@ -23,7 +23,8 @@ class AuthController extends Controller
                 'password' => 'required|string',
             ]);
 
-            $user = User::where('email', $request->email)->first();
+            // Load the user with their role relationship
+            $user = User::with('role')->where('email', $request->email)->first();
 
             if (!$user || !Hash::check($request->password, $user->password)) {
                 return response()->json([
@@ -43,6 +44,7 @@ class AuthController extends Controller
                         'id' => $user->id,
                         'name' => $user->name,
                         'email' => $user->email,
+                        'role' => $user->role // This includes the role object with its name
                     ],
                     'token' => $token,
                     'token_type' => 'Bearer'
@@ -66,6 +68,35 @@ class AuthController extends Controller
                 'success' => false,
                 'message' => 'An error occurred during login',
                 'debug' => config('app.debug') ? $e->getMessage() : null
+            ], 500);
+        }
+    }
+
+    /**
+     * Get authenticated user details
+     */
+    public function me(Request $request)
+    {
+        try {
+            $user = $request->user()->load('role');
+            
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'user' => [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'role' => $user->role
+                    ]
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Get user error: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching user data'
             ], 500);
         }
     }

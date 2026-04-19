@@ -1,5 +1,5 @@
 <template>
-  <header class="bg-white/90 backdrop-blur-xl border-b border-gray-200/80 h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 shadow-sm z-40 sticky top-0 transition-all duration-300">
+  <header class="bg-white/90 backdrop-blur-xl border-b border-gray-200/80 h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 shadow-sm z-30 transition-all duration-300">
     <!-- Left Section -->
     <div class="flex items-center gap-3">
       <!-- Mobile Menu Toggle -->

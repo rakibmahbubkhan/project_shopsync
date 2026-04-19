@@ -1,9 +1,9 @@
 <template>
   <aside 
-    class="h-screen fixed left-0 top-0 z-50 flex flex-col transition-all duration-500 ease-in-out"
+    class="h-screen fixed left-0 top-0 z-50 flex flex-col transition-all duration-300 ease-in-out"
     :class="[
-      isCollapsed ? 'w-20' : 'w-72',
-      'bg-gradient-to-b from-slate-900/95 via-slate-800/95 to-indigo-900/95'
+      isCollapsed ? 'w-[72px]' : 'w-80',
+      'bg-gradient-to-b from-slate-900 via-slate-800 to-indigo-900'
     ]"
   >
     <!-- Animated Background Elements -->
@@ -13,144 +13,155 @@
     </div>
     
     <!-- Main content with glass effect -->
-    <div class="relative flex flex-col h-full backdrop-blur-2xl bg-white/5 border-r border-white/10">
+    <div class="relative flex flex-col h-full backdrop-blur-xl bg-white/5">
       
       <!-- Decorative top gradient line -->
-      <div class="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500 to-transparent"></div>
+      <div class="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent"></div>
       
-      <!-- Logo Section with Collapse Toggle -->
-      <div class="relative p-5 border-b border-white/10 flex items-center justify-between">
+      <!-- Logo Section -->
+      <div class="relative p-4 border-b border-white/10 flex items-center justify-between min-h-[72px]">
         <!-- Logo -->
         <div class="flex items-center gap-3 overflow-hidden">
           <div class="relative flex-shrink-0 group">
-            <!-- Animated rings -->
             <div class="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl blur-lg opacity-50 group-hover:opacity-75 transition-opacity"></div>
             <div class="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl animate-ping-slow opacity-20"></div>
-            <div class="relative w-10 h-10 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 text-white rounded-xl flex items-center justify-center font-black text-xl shadow-2xl">
+            <div class="relative w-10 h-10 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 text-white rounded-xl flex items-center justify-center font-black text-lg shadow-2xl">
               SS
             </div>
           </div>
-          <h2 
-            class="font-black text-2xl transition-all duration-500 whitespace-nowrap"
-            :class="isCollapsed ? 'opacity-0 w-0' : 'opacity-100 w-auto'"
+          <div 
+            class="transition-all duration-300 overflow-hidden whitespace-nowrap"
+            :class="isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'"
           >
-            <span class="bg-gradient-to-r from-white via-blue-100 to-purple-100 bg-clip-text text-transparent">ShopSync</span>
-          </h2>
+            <h2 class="font-bold text-xl">
+              <span class="bg-gradient-to-r from-white via-blue-100 to-purple-100 bg-clip-text text-transparent">ShopSync</span>
+            </h2>
+          </div>
         </div>
 
         <!-- Collapse Toggle Button -->
         <button 
           @click="toggleSidebar"
-          class="absolute -right-3 top-1/2 -translate-y-1/2 w-7 h-7 bg-white/10 backdrop-blur-xl rounded-full border border-white/20 flex items-center justify-center hover:bg-white/20 transition-all group shadow-xl hover:scale-110 hover:border-white/40"
-          :class="{ 'rotate-180': isCollapsed }" style="background-color: red;"
+          class="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-slate-800/90 backdrop-blur-xl rounded-full border border-white/20 flex items-center justify-center hover:bg-slate-700 transition-all group shadow-lg hover:scale-110 hover:border-white/40 z-10"
+          :class="{ 'rotate-180': !isCollapsed }"
         >
-          <svg class="w-3.5 h-3.5 text-white/70 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path>
+          <svg class="w-3 h-3 text-white/70 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path>
           </svg>
         </button>
       </div>
       
       <!-- Navigation -->
-      <nav class="flex-1 mt-6 px-3 space-y-1 overflow-y-auto custom-scrollbar">
+      <nav class="flex-1 mt-4 px-3 space-y-1 overflow-y-auto custom-scrollbar">
         <!-- Main Menu Section -->
-        <div v-if="!isCollapsed" class="px-3 mb-3">
-          <p class="text-[10px] font-bold text-white/40 uppercase tracking-wider">Main Menu</p>
+        <div v-if="!isCollapsed" class="px-2 mb-2">
+          <p class="text-[10px] font-semibold text-white/40 uppercase tracking-wider">Main Menu</p>
         </div>
         
-        <router-link to="/dashboard" class="nav-item group" active-class="active" :class="{ 'justify-center': isCollapsed }">
-          <span class="icon">📊</span>
-          <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm">Dashboard</span>
-          <span v-if="!isCollapsed" class="badge-modern">New</span>
-          <span v-else class="tooltip">Dashboard</span>
+        <!-- Dashboard -->
+        <router-link 
+          :to="'/dashboard'" 
+          class="nav-item group" 
+          active-class="active" 
+          :class="{ 'justify-center': isCollapsed }"
+        >
+          <span class="icon text-lg">📊</span>
+          <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm font-medium">Dashboard</span>
+          <span v-if="!isCollapsed" class="badge-modern from-blue-500 to-indigo-500">New</span>
+          <span v-if="isCollapsed" class="tooltip">Dashboard</span>
         </router-link>
 
-        <router-link to="/pos" class="nav-item group" active-class="active" :class="{ 'justify-center': isCollapsed }">
-          <span class="icon">🖥️</span>
-          <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm">POS System</span>
-          <span v-if="!isCollapsed" class="badge-live-modern">
-            <span class="relative flex h-1.5 w-1.5">
-              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
-            </span>
-            Live
-          </span>
-          <span v-else class="tooltip">POS System</span>
+        <!-- POS System -->
+        <router-link 
+          :to="'/pos'" 
+          class="nav-item group" 
+          active-class="active" 
+          :class="{ 'justify-center': isCollapsed }"
+        >
+          <span class="icon text-lg">🖥️</span>
+          <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm font-medium">POS System</span>
+          <span v-if="!isCollapsed" class="badge-modern from-green-500 to-emerald-500">Live</span>
+          <span v-if="isCollapsed" class="tooltip">POS System</span>
         </router-link>
 
-        <router-link to="/products" class="nav-item group" active-class="active" :class="{ 'justify-center': isCollapsed }">
-          <span class="icon">🔧</span>
-          <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm">Inventory</span>
-          <span v-if="!isCollapsed" class="badge-count-modern">3</span>
-          <span v-else class="tooltip">Inventory</span>
-        </router-link>
+        <!-- Inventory with Collapsible Submenu -->
+        <div class="space-y-1">
+          <button 
+            @click="toggleInventoryMenu"
+            class="nav-item group w-full flex items-center" 
+            :class="{ 
+              'justify-center': isCollapsed, 
+              'bg-white/10 text-white': isInventoryOpen 
+            }"
+          >
+            <span class="icon text-lg">🔧</span>
+            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm text-left">Inventory</span>
+            <span v-if="!isCollapsed && !isInventoryOpen" class="badge-modern from-orange-500 to-red-500">3</span>
+            <svg 
+              v-if="!isCollapsed" 
+              class="w-4 h-4 transition-transform duration-300" 
+              :class="{ 'rotate-180': isInventoryOpen }" 
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+            <span v-if="isCollapsed" class="tooltip">Inventory</span>
+          </button>
+
+          <!-- Submenu Items -->
+          <div v-if="!isCollapsed && isInventoryOpen" class="pl-10 space-y-1 mt-1">
+            <router-link to="/products" class="sub-nav-item" active-class="active-sub">
+              All Products
+            </router-link>
+            <router-link to="/categories" class="sub-nav-item" active-class="active-sub">
+              Categories
+            </router-link>
+            <router-link to="/brands" class="sub-nav-item" active-class="active-sub">
+              Brands
+            </router-link>
+            <router-link to="/units" class="sub-nav-item" active-class="active-sub">
+              Units
+            </router-link>
+          </div>
+        </div>
 
         <!-- Operations Section -->
-        <div class="mt-8">
-          <div v-if="!isCollapsed" class="px-3 mb-3">
-            <p class="text-[10px] font-bold text-white/40 uppercase tracking-wider">Operations</p>
+        <div class="mt-6">
+          <div v-if="!isCollapsed" class="px-2 mb-2">
+            <p class="text-[10px] font-semibold text-white/40 uppercase tracking-wider">Operations</p>
           </div>
           
-          <router-link to="/sales" class="nav-item group" active-class="active" :class="{ 'justify-center': isCollapsed }">
-            <span class="icon">💰</span>
-            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm">Sales History</span>
-            <span v-else class="tooltip">Sales History</span>
-          </router-link>
-
-          <router-link to="/purchases" class="nav-item group" active-class="active" :class="{ 'justify-center': isCollapsed }">
-            <span class="icon">📋</span>
-            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm">Purchase List</span>
-            <span v-else class="tooltip">Purchase List</span>
-          </router-link>
-
-          <router-link to="/purchases/create" class="nav-item group" active-class="active" :class="{ 'justify-center': isCollapsed }">
-            <span class="icon">📦</span>
-            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm">New Purchase</span>
-            <span v-else class="tooltip">New Purchase</span>
-          </router-link>
-
-          <!-- Suppliers Link -->
-          <router-link to="/suppliers" class="nav-item group" active-class="active" :class="{ 'justify-center': isCollapsed }">
-            <span class="icon">🏭</span>
-            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm">Suppliers</span>
-            <span v-else class="tooltip">Suppliers</span>
-          </router-link>
-
-          <!-- Warehouses Link -->
-          <router-link to="/warehouses" class="nav-item group" active-class="active" :class="{ 'justify-center': isCollapsed }">
-            <span class="icon">🏪</span>
-            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm">Warehouses</span>
-            <span v-else class="tooltip">Warehouses</span>
-          </router-link>
-
-          <router-link to="/inventory/transfer" class="nav-item group" active-class="active" :class="{ 'justify-center': isCollapsed }">
-            <span class="icon">🚚</span>
-            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm">Stock Transfer</span>
-            <span v-else class="tooltip">Stock Transfer</span>
+          <router-link 
+            v-for="item in operationItems" 
+            :key="item.to"
+            :to="item.to" 
+            class="nav-item group" 
+            active-class="active" 
+            :class="{ 'justify-center': isCollapsed }"
+          >
+            <span class="icon text-lg">{{ item.icon }}</span>
+            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm font-medium">{{ item.label }}</span>
+            <span v-if="isCollapsed" class="tooltip">{{ item.label }}</span>
           </router-link>
         </div>
 
         <!-- Administration Section (Admin Only) -->
-        <div v-if="isAdmin" class="mt-8">
-          <div v-if="!isCollapsed" class="px-3 mb-3">
-            <p class="text-[10px] font-bold text-white/40 uppercase tracking-wider">Administration</p>
+        <div v-if="isAdmin" class="mt-6">
+          <div v-if="!isCollapsed" class="px-2 mb-2">
+            <p class="text-[10px] font-semibold text-white/40 uppercase tracking-wider">Administration</p>
           </div>
           
-          <router-link to="/users" class="nav-item group" active-class="active" :class="{ 'justify-center': isCollapsed }">
-            <span class="icon">👥</span>
-            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm">Staff Management</span>
-            <span v-else class="tooltip">Staff Management</span>
-          </router-link>
-
-          <router-link to="/financial" class="nav-item group" active-class="active" :class="{ 'justify-center': isCollapsed }">
-            <span class="icon">📈</span>
-            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm">Financial Reports</span>
-            <span v-else class="tooltip">Financial Reports</span>
-          </router-link>
-
-          <router-link to="/audit-logs" class="nav-item group" active-class="active" :class="{ 'justify-center': isCollapsed }">
-            <span class="icon">📜</span>
-            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm">System Logs</span>
-            <span v-else class="tooltip">System Logs</span>
+          <router-link 
+            v-for="item in adminItems" 
+            :key="item.to"
+            :to="item.to" 
+            class="nav-item group" 
+            active-class="active" 
+            :class="{ 'justify-center': isCollapsed }"
+          >
+            <span class="icon text-lg">{{ item.icon }}</span>
+            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm font-medium">{{ item.label }}</span>
+            <span v-if="isCollapsed" class="tooltip">{{ item.label }}</span>
           </router-link>
         </div>
       </nav>
@@ -158,57 +169,59 @@
       <!-- User Profile Section -->
       <div class="relative mt-auto border-t border-white/10 bg-gradient-to-t from-black/20 to-transparent backdrop-blur-xl">
         <!-- Collapsed Profile View -->
-        <div v-if="isCollapsed" class="p-4 flex justify-center">
+        <div v-if="isCollapsed" class="py-4 flex justify-center">
           <div class="relative group">
             <div class="relative">
               <div class="absolute inset-0 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl blur-md opacity-50 group-hover:opacity-75 transition-opacity"></div>
-              <div class="relative w-11 h-11 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 text-white rounded-xl flex items-center justify-center font-bold text-xl shadow-2xl">
-                {{ auth.user?.name?.charAt(0).toUpperCase() || 'U' }}
+              <div class="relative w-10 h-10 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 text-white rounded-xl flex items-center justify-center font-bold text-base shadow-2xl cursor-pointer">
+                {{ userInitial }}
               </div>
-              <div class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-slate-900"></div>
+              <div class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-slate-900"></div>
             </div>
             
             <div class="absolute left-full ml-3 bottom-0 w-48 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-50">
-              <div class="relative bg-white/10 backdrop-blur-xl rounded-xl p-3 border border-white/20 shadow-2xl">
-                <div class="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-white/10 backdrop-blur-xl rotate-45 border-l border-t border-white/20"></div>
-                <p class="text-sm font-bold text-white">{{ auth.user?.name || 'User' }}</p>
-                <p class="text-xs text-white/60 mt-0.5">{{ auth.user?.role?.name || 'Guest' }}</p>
+              <div class="relative bg-slate-800/90 backdrop-blur-xl rounded-xl p-3 border border-white/20 shadow-2xl">
+                <div class="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-slate-800/90 rotate-45 border-l border-t border-white/20"></div>
+                <p class="text-sm font-bold text-white truncate">{{ userName }}</p>
+                <p class="text-xs text-white/60 mt-0.5">{{ userRole }}</p>
               </div>
             </div>
           </div>
         </div>
 
         <!-- Expanded Profile View -->
-        <div v-else class="p-4">
+        <div v-else class="p-3">
           <div class="flex items-center gap-3">
             <div class="relative group">
               <div class="absolute inset-0 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl blur-md opacity-50 group-hover:opacity-75 transition-opacity"></div>
-              <div class="relative w-12 h-12 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 text-white rounded-xl flex items-center justify-center font-bold text-xl shadow-2xl">
-                {{ auth.user?.name?.charAt(0).toUpperCase() || 'U' }}
+              <div class="relative w-10 h-10 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 text-white rounded-xl flex items-center justify-center font-bold text-base shadow-2xl">
+                {{ userInitial }}
               </div>
-              <div class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-slate-900"></div>
+              <div class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-slate-900"></div>
             </div>
-            <div class="overflow-hidden">
-              <p class="text-sm font-bold text-white truncate">{{ auth.user?.name || 'Loading...' }}</p>
+            <div class="overflow-hidden flex-1">
+              <p class="text-sm font-bold text-white truncate">{{ userName }}</p>
               <p class="text-xs text-white/60 font-medium flex items-center gap-1.5 mt-0.5">
-                <span class="relative flex h-2 w-2">
+                <span class="relative flex h-1.5 w-1.5">
                   <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                  <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                  <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
                 </span>
-                {{ auth.user?.role?.name || 'Guest' }}
+                {{ userRole }}
               </p>
             </div>
           </div>
         </div>
         
         <!-- Logout Button -->
-        <button @click="handleLogout" class="logout-btn group" :class="{ 'justify-center': isCollapsed }">
-          <div class="absolute inset-0 bg-gradient-to-r from-red-500/0 to-red-500/0 group-hover:from-red-500/20 group-hover:to-orange-500/20 transition-all duration-500"></div>
-          
-          <span class="relative text-lg transform group-hover:scale-110 transition-transform">🚪</span>
-          <span v-if="!isCollapsed" class="relative text-sm font-medium">Logout</span>
-          <span v-if="!isCollapsed" class="relative right-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-0 translate-x-2 transition-all">→</span>
-          <span v-else class="tooltip">Logout</span>
+        <button 
+          @click="handleLogout" 
+          class="logout-btn group w-full flex items-center gap-2 py-3 px-4 transition-all duration-300"
+          :class="{ 'justify-center': isCollapsed }"
+        >
+          <span class="text-lg transform group-hover:scale-110 transition-transform">🚪</span>
+          <span v-if="!isCollapsed" class="text-sm font-medium">Logout</span>
+          <span v-if="!isCollapsed" class="ml-auto opacity-0 group-hover:opacity-100 group-hover:translate-x-0 -translate-x-1 transition-all">→</span>
+          <span v-if="isCollapsed" class="tooltip">Logout</span>
         </button>
       </div>
     </div>
@@ -216,7 +229,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import { useSidebarStore } from '@/stores/sidebarStore';
@@ -230,9 +243,22 @@ const sidebarStore = useSidebarStore();
 // Sidebar collapse state
 const isCollapsed = computed(() => sidebarStore.isCollapsed);
 
+// Inventory submenu state
+const isInventoryOpen = ref(false);
+
 // Load saved state from localStorage
 onMounted(() => {
   sidebarStore.loadState();
+  // Load inventory menu state from localStorage
+  const savedInventoryState = localStorage.getItem('inventoryMenuOpen');
+  if (savedInventoryState !== null) {
+    isInventoryOpen.value = JSON.parse(savedInventoryState);
+  }
+});
+
+// Watch for changes and emit
+watch(isCollapsed, (newVal) => {
+  emit('toggle', !newVal);
 });
 
 // Toggle sidebar and save state
@@ -240,9 +266,37 @@ const toggleSidebar = () => {
   sidebarStore.toggleSidebar();
 };
 
+// Toggle inventory submenu
+const toggleInventoryMenu = () => {
+  if (!isCollapsed.value) {
+    isInventoryOpen.value = !isInventoryOpen.value;
+    localStorage.setItem('inventoryMenuOpen', JSON.stringify(isInventoryOpen.value));
+  }
+};
+
 const isAdmin = computed(() => {
-  return auth.user?.role?.name === 'Admin' || auth.user?.role?.name === 'admin';
+  return auth.user?.role_id === 1 || auth.user?.role === 'admin';
 });
+
+const userName = computed(() => auth.user?.name || 'User');
+const userRole = computed(() => auth.user?.role?.name || 'Guest');
+const userInitial = computed(() => userName.value.charAt(0).toUpperCase());
+
+// Menu items configuration
+const operationItems = [
+  { to: '/sales', icon: '💰', label: 'Sales History' },
+  { to: '/purchases', icon: '📋', label: 'Purchase List' },
+  { to: '/purchases/create', icon: '📦', label: 'New Purchase' },
+  { to: '/suppliers', icon: '🏭', label: 'Suppliers' },
+  { to: '/warehouses', icon: '🏪', label: 'Warehouses' },
+  { to: '/inventory/transfer', icon: '🚚', label: 'Stock Transfer' }
+];
+
+const adminItems = [
+  { to: '/users', icon: '👥', label: 'Staff Management' },
+  { to: '/financial', icon: '📈', label: 'Financial Reports' },
+  { to: '/audit-logs', icon: '📜', label: 'System Logs' }
+];
 
 const handleLogout = async () => {
   try {
@@ -252,87 +306,155 @@ const handleLogout = async () => {
     console.error('Logout failed:', error);
   }
 };
+
 </script>
 
 <style scoped>
-@reference "../assets/main.css"; 
-
 /* Navigation item styling - Modern Glass Effect */
 .nav-item {
-  @apply relative flex items-center px-3 py-2.5 text-sm font-medium text-white/60 rounded-xl transition-all duration-300;
   position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+  border-radius: 0.75rem;
+  transition: all 0.3s ease;
   overflow: hidden;
 }
 
 /* Hover effect with glass morphism */
 .nav-item::before {
   content: '';
-  @apply absolute inset-0 bg-gradient-to-r from-white/0 via-white/5 to-white/0 opacity-0 transition-opacity duration-500;
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, rgba(255,255,255,0), rgba(255,255,255,0.05), rgba(255,255,255,0));
+  opacity: 0;
+  transition: opacity 0.5s ease;
   transform: translateX(-100%);
 }
 
 .nav-item:hover::before {
-  @apply opacity-100;
+  opacity: 1;
   transform: translateX(100%);
 }
 
 .nav-item:hover {
-  @apply text-white bg-white/10;
+  color: white;
+  background-color: rgba(255, 255, 255, 0.1);
   transform: translateX(4px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 /* Active state with gradient */
 .nav-item.active {
-  @apply text-white bg-gradient-to-r from-blue-600/30 via-indigo-600/30 to-purple-600/30;
+  color: white;
+  background: linear-gradient(to right, rgba(37, 99, 235, 0.3), rgba(79, 70, 229, 0.3), rgba(147, 51, 234, 0.3));
   box-shadow: 0 4px 20px rgba(79, 70, 229, 0.15);
-  border-left: 3px solid;
+  border-left: 2px solid;
   border-image: linear-gradient(to bottom, #3b82f6, #8b5cf6) 1;
 }
 
 .nav-item.active .icon {
-  @apply transform scale-110;
+  transform: scale(1.1);
   filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.5));
+}
+
+/* Submenu item styling */
+.sub-nav-item {
+  position: relative;
+  display: block;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.813rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.sub-nav-item:hover {
+  color: white;
+  background-color: rgba(255, 255, 255, 0.08);
+  transform: translateX(4px);
+}
+
+.sub-nav-item.active-sub {
+  color: white;
+  background: linear-gradient(to right, rgba(37, 99, 235, 0.2), rgba(79, 70, 229, 0.2));
+  border-left: 2px solid #3b82f6;
+  padding-left: calc(0.75rem - 2px);
 }
 
 /* Icon styling */
 .icon {
-  @apply text-xl filter drop-shadow-lg transition-all duration-300;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
+  transition: all 0.3s ease;
   flex-shrink: 0;
 }
 
 /* Modern Badge Styles */
 .badge-modern {
-  @apply px-1.5 py-0.5 text-[8px] font-bold bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-full ml-2 shadow-lg;
+  padding: 0.125rem 0.375rem;
+  font-size: 9px;
+  font-weight: bold;
+  color: white;
+  border-radius: 9999px;
+  margin-left: 0.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   animation: pulse 2s infinite;
-}
-
-.badge-live-modern {
-  @apply px-1.5 py-0.5 text-[8px] font-bold bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full ml-2 flex items-center gap-1 shadow-lg;
-}
-
-.badge-count-modern {
-  @apply px-1.5 py-0.5 text-[8px] font-bold bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-full ml-2 shadow-lg;
+  background: linear-gradient(to right, var(--tw-gradient-from), var(--tw-gradient-to));
 }
 
 /* Modern Tooltip */
 .tooltip {
-  @apply absolute left-full ml-3 px-3 py-1.5 bg-white/10 backdrop-blur-xl text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-300 whitespace-nowrap z-50 border border-white/20 shadow-2xl;
+  position: absolute;
+  left: 100%;
+  margin-left: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background-color: rgb(30, 41, 59);
+  backdrop-filter: blur(16px);
+  color: white;
+  font-size: 0.75rem;
+  border-radius: 0.375rem;
+  opacity: 0;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  z-index: 50;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  pointer-events: none;
 }
 
 .tooltip::before {
   content: '';
-  @apply absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-white/10 backdrop-blur-xl rotate-45 border-l border-t border-white/20;
+  position: absolute;
+  left: -0.25rem;
+  top: 50%;
+  transform: translateY(-50%) rotate(45deg);
+  width: 0.375rem;
+  height: 0.375rem;
+  background-color: rgb(30, 41, 59);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.group:hover .tooltip {
+  opacity: 1;
 }
 
 /* Logout button */
 .logout-btn {
-  @apply w-full relative overflow-hidden text-sm font-medium text-white/60 hover:text-white transition-all duration-300 flex items-center gap-2 py-3 px-4;
+  position: relative;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.6);
+  transition: all 0.3s ease;
   background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(239, 68, 68, 0.05) 100%);
   border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .logout-btn:hover {
+  color: white;
   background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.1) 100%);
 }
 
@@ -343,7 +465,7 @@ const handleLogout = async () => {
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
+  width: 3px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -354,10 +476,6 @@ const handleLogout = async () => {
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: linear-gradient(to bottom, #3b82f6, #8b5cf6);
   border-radius: 4px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(to bottom, #2563eb, #7c3aed);
 }
 
 /* Animations */
@@ -378,6 +496,11 @@ const handleLogout = async () => {
   }
 }
 
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
 .animate-pulse-slow {
   animation: pulse-slow 8s ease-in-out infinite;
 }
@@ -390,32 +513,14 @@ const handleLogout = async () => {
   animation: ping-slow 3s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
-/* Smooth transitions */
-.transition-all {
-  transition-property: all;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 500ms;
-}
-
 /* Glass effect optimization */
-.backdrop-blur-2xl {
-  backdrop-filter: blur(40px);
-  -webkit-backdrop-filter: blur(40px);
+.backdrop-blur-xl {
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
 }
 
-/* Hover effects */
-.group:hover .group-hover\:scale-110 {
-  transform: scale(1.1);
-}
-
-/* Active link indicator */
-.nav-item.active {
-  position: relative;
-}
-
-.nav-item.active::after {
-  content: '';
-  @apply absolute right-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full;
-  animation: pulse 2s infinite;
+/* Center items when collapsed */
+.justify-center {
+  justify-content: center;
 }
 </style>

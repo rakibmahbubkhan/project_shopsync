@@ -3,22 +3,31 @@ import api from "@/api/axios";
 
 export const useAuthStore = defineStore("auth", {
   state: () => ({
-    user: null,
+    // Parse the stored user string back into an object
+    user: JSON.parse(localStorage.getItem("user")) || null,
     token: localStorage.getItem("token") || null,
   }),
 
   actions: {
     async login(credentials) {
       const response = await api.post("/login", credentials);
-      this.token = response.data.token;
-      this.user = response.data.user;
-      localStorage.setItem("token", this.token);
+      
+      // Note: your current backend returns data inside a 'data' wrapper
+      const userData = response.data.data.user;
+      const tokenData = response.data.data.token;
+
+      this.token = tokenData;
+      this.user = userData;
+
+      localStorage.setItem("token", tokenData);
+      localStorage.setItem("user", JSON.stringify(userData)); // Save the whole object
     },
 
     logout() {
       this.token = null;
       this.user = null;
       localStorage.removeItem("token");
+      localStorage.removeItem("user");
     },
   },
 });

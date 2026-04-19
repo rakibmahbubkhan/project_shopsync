@@ -173,7 +173,7 @@
       </div>
       
       <!-- RIGHT SIDE: Cart Section -->
-      <div class="w-full lg:w-96 bg-white border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col shadow-lg mt-4 lg:mt-0">
+      <div class="w-full lg:w-140 bg-white border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col shadow-lg mt-4 lg:mt-0">
         
         <!-- Cart Header -->
         <div class="p-3 sm:p-4 border-b border-gray-200 flex-shrink-0">
