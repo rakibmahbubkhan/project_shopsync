@@ -132,11 +132,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/products/form-data', [ProductController::class, 'getFormData']);
 
     Route::get('products/create', [ProductController::class, 'create']); 
-    Route::get('categories', [CategoryController::class, 'index']);
-    Route::get('brands', [BrandController::class, 'index']);
+    Route::apiResource('brands', BrandController::class)->only(['index']);
+    Route::apiResource('categories', CategoryController::class)->only(['index']);
 
     Route::get('units', [UnitController::class, 'index']);
-    Route::get('warehouses', [WarehouseController::class, 'index']);
 
     Route::apiResource('products', ProductController::class);
     Route::apiResource('categories', CategoryController::class);
@@ -174,6 +173,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::apiResource('customers', CustomerController::class);
     Route::apiResource('warehouses', WarehouseController::class);
+
+    Route::get('/sales/recent-products', [SaleController::class, 'recentProducts']);
 
 
 

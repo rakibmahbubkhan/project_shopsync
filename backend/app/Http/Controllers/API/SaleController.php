@@ -348,24 +348,35 @@ public function store(StoreSaleRequest $request)
     /**
      * Generate PDF receipt for sale.
      */
-    public function receipt(Sale $sale)
-    {
-        $sale->load(['items.product', 'customer', 'user', 'warehouse']);
-
-        $pdf = Pdf::loadView('receipts.sale', [
-            'sale' => $sale,
-            'company' => [
-                'name'    => config('app.name'),
-                'address' => config('app.address', 'Your Company Address'),
-                'phone'   => config('app.phone', 'Your Phone'),
-                'email'   => config('app.email', 'your@email.com'),
-                'tax_id'  => config('app.tax_id', 'Your Tax ID'),
-            ]
-        ]);
-
-        return $pdf->stream("invoice_{$sale->id}.pdf");
-    }
-
+    /**
+ * Generate PDF receipt for sale.
+ */
+public function receipt(Sale $sale)
+{
+    $sale->load([
+        'items.product', 
+        'customer', 
+        'user', 
+        'warehouse'
+    ]);
+    
+    $pdf = Pdf::loadView('receipts.sale', [
+        'sale' => $sale,
+        'company' => [
+            'name'    => config('app.name', 'ShopSync'),
+            'address' => config('app.address', '123 Business Ave, Commercial District'),
+            'phone'   => config('app.phone', '+880 1234 567890'),
+            'email'   => config('app.email', 'info@shopsync.com'),
+            'tax_id'  => config('app.tax_id', 'TAX-123456789'),
+        ]
+    ]);
+    
+    // Set paper size and orientation
+    $pdf->setPaper('A4', 'portrait');
+    
+    // Return for download or stream
+    return $pdf->stream("invoice_{$sale->id}.pdf");
+}
     /**
      * Process a return for a sale item.
      */
@@ -581,5 +592,28 @@ public function store(StoreSaleRequest $request)
             'wallet' => config('accounts.mobile_wallet', 8),
             default => config('accounts.accounts_receivable', 9),
         };
+    }
+
+    /**
+ * Get recently sold products
+ */
+    public function recentProducts(Request $request): JsonResponse
+    {
+        $limit = $request->get('limit', 10);
+        
+        $recentProducts = SaleItem::with('product')
+            ->select('product_id', DB::raw('MAX(created_at) as last_sold'))
+            ->groupBy('product_id')
+            ->orderBy('last_sold', 'desc')
+            ->limit($limit)
+            ->get()
+            ->map(function($item) {
+                return $item->product;
+            });
+        
+        return response()->json([
+            'success' => true,
+            'data' => $recentProducts
+        ]);
     }
 }
