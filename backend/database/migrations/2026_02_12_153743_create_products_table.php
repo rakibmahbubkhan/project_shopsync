@@ -30,6 +30,9 @@ return new class extends Migration
             ->constrained()
             ->cascadeOnDelete();
 
+        $table->foreignId('tax_id')->nullable()->constrained()->nullOnDelete();
+
+
         $table->decimal('cost_price', 15, 2);
         $table->decimal('selling_price', 15, 2);
 

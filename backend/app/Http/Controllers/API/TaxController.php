@@ -3,28 +3,28 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
-use App\Models\Brand;
+use App\Models\Tax;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
-class BrandController extends Controller
+class TaxController extends Controller
 {
     /**
-     * Display a listing of all brands.
+     * Display a listing of all taxes.
      *
      * @return \Illuminate\Http\JsonResponse
      */
     public function index()
     {
-        $brands = Brand::orderBy('name')->get();
+        $taxes = Tax::orderBy('name')->get();
         return response()->json([
             'success' => true,
-            'data' => $brands
+            'data' => $taxes
         ]);
     }
 
     /**
-     * Store a newly created brand in storage.
+     * Store a newly created tax in storage.
      *
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
@@ -32,83 +32,82 @@ class BrandController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:brands,name',
-            'description' => 'nullable|string',
+            'name' => 'required|string|max:255|unique:taxes,name',
+            'percentage' => 'required|numeric|min:0|max:100',
         ]);
 
-        $brand = Brand::create($validated);
+        $tax = Tax::create($validated);
 
         return response()->json([
             'success' => true,
-            'message' => 'Brand created successfully',
-            'data' => $brand
+            'message' => 'Tax created successfully',
+            'data' => $tax
         ], 201);
     }
 
     /**
-     * Display the specified brand.
+     * Display the specified tax.
      *
-     * @param  \App\Models\Brand  $brand
+     * @param  \App\Models\Tax  $tax
      * @return \Illuminate\Http\JsonResponse
      */
-    public function show(Brand $brand)
+    public function show(Tax $tax)
     {
         return response()->json([
             'success' => true,
-            'data' => $brand
+            'data' => $tax
         ]);
     }
 
     /**
-     * Update the specified brand in storage.
+     * Update the specified tax in storage.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Models\Brand  $brand
+     * @param  \App\Models\Tax  $tax
      * @return \Illuminate\Http\JsonResponse
      */
-    public function update(Request $request, Brand $brand)
+    public function update(Request $request, Tax $tax)
     {
         $validated = $request->validate([
             'name' => [
-                'sometimes',
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('brands')->ignore($brand->id)
+                Rule::unique('taxes')->ignore($tax->id)
             ],
-            'description' => 'nullable|string',
+            'percentage' => 'required|numeric|min:0|max:100',
         ]);
 
-        $brand->update($validated);
+        $tax->update($validated);
 
         return response()->json([
             'success' => true,
-            'message' => 'Brand updated successfully',
-            'data' => $brand
+            'message' => 'Tax updated successfully',
+            'data' => $tax
         ]);
     }
 
     /**
-     * Remove the specified brand from storage.
+     * Remove the specified tax from storage.
      *
-     * @param  \App\Models\Brand  $brand
+     * @param  \App\Models\Tax  $tax
      * @return \Illuminate\Http\JsonResponse
      */
-    public function destroy(Brand $brand)
+    public function destroy(Tax $tax)
     {
-        // Check if brand has any products
-        if ($brand->products()->exists()) {
+        // Check if tax has any products
+        if ($tax->products()->exists()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Cannot delete brand with associated products.'
+                'message' => 'Cannot delete tax with associated products.'
             ], 422);
         }
 
-        $brand->delete();
+        $tax->delete();
 
         return response()->json([
             'success' => true,
-            'message' => 'Brand deleted successfully'
+            'message' => 'Tax deleted successfully'
         ]);
     }
 }

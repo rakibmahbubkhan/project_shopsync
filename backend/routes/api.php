@@ -115,6 +115,8 @@ use App\Http\Controllers\API\CustomerController;
 use App\Http\Controllers\API\WarehouseController;
 use App\Http\Controllers\API\BrandController;
 use App\Http\Controllers\API\UnitController;
+use App\Http\Controllers\API\TaxController;
+use App\Http\Controllers\API\VariantController;
 
 // Public Auth Routes
 Route::post('/login', [AuthController::class, 'login']);
@@ -128,17 +130,26 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('users', UserController::class);
 
     // 2. Inventory & Products
-
     Route::get('/products/form-data', [ProductController::class, 'getFormData']);
-
     Route::get('products/create', [ProductController::class, 'create']); 
     Route::apiResource('brands', BrandController::class)->only(['index']);
     Route::apiResource('categories', CategoryController::class)->only(['index']);
-
     Route::get('units', [UnitController::class, 'index']);
-
     Route::apiResource('products', ProductController::class);
     Route::apiResource('categories', CategoryController::class);
+
+    // 2.1 Tax Management
+    Route::apiResource('taxes', TaxController::class);
+
+    // 2.2 Variant Management
+    Route::apiResource('variants', VariantController::class);
+    
+    // Variant Items - Nested Routes
+    Route::prefix('variants/{variant}')->group(function () {
+        Route::post('/items', [VariantController::class, 'storeItem']);
+        Route::put('/items/{item}', [VariantController::class, 'updateItem']);
+        Route::delete('/items/{item}', [VariantController::class, 'destroyItem']);
+    });
 
     // 3. Sales & POS
     Route::get('sales/{sale}/receipt', [SaleController::class, 'receipt']);
@@ -172,29 +183,25 @@ Route::middleware('auth:sanctum')->group(function () {
     // 9. System Auditing
     Route::get('audit-logs', [AuditLogController::class, 'index']);
 
+    // 10. Customers & Warehouses
     Route::apiResource('customers', CustomerController::class);
     Route::apiResource('warehouses', WarehouseController::class);
 
-    Route::get('/sales/recent-products', [SaleController::class, 'recentProducts']);
-
-
-    // Add this route inside the auth:sanctum group
+    // 11. POS Init Data
     Route::get('/pos/init', function() {
         return response()->json([
             'categories' => \App\Models\Category::select('id', 'name')->get(),
             'brands' => \App\Models\Brand::select('id', 'name')->get(),
             'customers' => \App\Models\Customer::select('id', 'name')->get(),
             'warehouses' => \App\Models\Warehouse::select('id', 'name')->get(),
+            'taxes' => \App\Models\Tax::select('id', 'name', 'percentage')->get(),
+            'variants' => \App\Models\Variant::with('items')->get(),
         ]);
     });
-
-
-
 });
 
-
-
-    Route::get('/debug-sale', function() {
+// Debug route (keep at the bottom)
+Route::get('/debug-sale', function() {
     try {
         $sale = new \App\Models\Sale();
         return response()->json(['message' => 'Sale model works']);

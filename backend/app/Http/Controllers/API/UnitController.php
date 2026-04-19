@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Models\Unit;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class UnitController extends Controller
 {
@@ -15,7 +16,11 @@ class UnitController extends Controller
      */
     public function index()
     {
-        return response()->json(Unit::all());
+        $units = Unit::orderBy('name')->get();
+        return response()->json([
+            'success' => true,
+            'data' => $units
+        ]);
     }
 
     /**
@@ -27,7 +32,7 @@ class UnitController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:units',
+            'name' => 'required|string|max:255|unique:units,name',
             'symbol' => 'nullable|string|max:50',
             'description' => 'nullable|string',
         ]);
@@ -35,8 +40,9 @@ class UnitController extends Controller
         $unit = Unit::create($validated);
 
         return response()->json([
+            'success' => true,
             'message' => 'Unit created successfully',
-            'unit' => $unit
+            'data' => $unit
         ], 201);
     }
 
@@ -48,7 +54,10 @@ class UnitController extends Controller
      */
     public function show(Unit $unit)
     {
-        return response()->json($unit);
+        return response()->json([
+            'success' => true,
+            'data' => $unit
+        ]);
     }
 
     /**
@@ -61,7 +70,13 @@ class UnitController extends Controller
     public function update(Request $request, Unit $unit)
     {
         $validated = $request->validate([
-            'name' => 'sometimes|required|string|max:255|unique:units,name,' . $unit->id,
+            'name' => [
+                'sometimes',
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('units')->ignore($unit->id)
+            ],
             'symbol' => 'nullable|string|max:50',
             'description' => 'nullable|string',
         ]);
@@ -69,8 +84,9 @@ class UnitController extends Controller
         $unit->update($validated);
 
         return response()->json([
+            'success' => true,
             'message' => 'Unit updated successfully',
-            'unit' => $unit
+            'data' => $unit
         ]);
     }
 
@@ -85,6 +101,7 @@ class UnitController extends Controller
         // Check if unit has any products
         if ($unit->products()->exists()) {
             return response()->json([
+                'success' => false,
                 'message' => 'Cannot delete unit with associated products.'
             ], 422);
         }
@@ -92,6 +109,7 @@ class UnitController extends Controller
         $unit->delete();
 
         return response()->json([
+            'success' => true,
             'message' => 'Unit deleted successfully'
         ]);
     }

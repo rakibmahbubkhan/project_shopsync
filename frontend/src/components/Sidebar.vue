@@ -122,6 +122,12 @@
             <router-link to="/units" class="sub-nav-item" active-class="active-sub">
               Units
             </router-link>
+            <router-link to="/taxes" class="sub-nav-item" active-class="active-sub">
+              Taxes
+            </router-link>
+            <router-link to="/variants" class="sub-nav-item" active-class="active-sub">
+              Variants
+            </router-link>
           </div>
         </div>
 
