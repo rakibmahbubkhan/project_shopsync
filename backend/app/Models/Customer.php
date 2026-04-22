@@ -12,7 +12,18 @@ class Customer extends Model
     protected $fillable = [
         'name',
         'email',
-        'phone',
-        'address',
+        'contact_person',
+        'website',
+        'mobile_number',
+        'phone_number',
+        'tax_number',
+        'billing_address',
+        'billing_country',
+        'billing_city',
+        'shipping_address',
+        'shipping_country',
+        'shipping_city',
+        'description',
+        'logo'
     ];
 }

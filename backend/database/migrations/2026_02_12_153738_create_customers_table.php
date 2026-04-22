@@ -15,8 +15,19 @@ return new class extends Migration
         $table->id();
         $table->string('name');
         $table->string('email')->nullable()->unique();
-        $table->string('phone')->nullable();
-        $table->text('address')->nullable();
+        $table->string('contact_person')->nullable();
+        $table->string('website')->nullable();
+        $table->string('mobile_number')->nullable();
+        $table->string('phone_number')->nullable(); // existing was 'phone'
+        $table->string('tax_number')->nullable();
+        $table->text('billing_address')->nullable();
+        $table->string('billing_country')->nullable();
+        $table->string('billing_city')->nullable();
+        $table->text('shipping_address')->nullable();
+        $table->string('shipping_country')->nullable();
+        $table->string('shipping_city')->nullable();
+        $table->text('description')->nullable();
+        $table->string('logo')->nullable();
         $table->timestamps();
 });
     }

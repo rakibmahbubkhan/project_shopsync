@@ -131,6 +131,19 @@
           </div>
         </div>
 
+        <!-- Customer -->
+        <router-link 
+          :to="'/customers'" 
+          class="nav-item group" 
+          active-class="active" 
+          :class="{ 'justify-center': isCollapsed }"
+        >
+          <span class="icon text-lg">👥</span>
+          <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm font-medium">Customer</span>
+          <span v-if="!isCollapsed" class="badge-modern from-blue-500 to-indigo-500">New</span>
+          <span v-if="isCollapsed" class="tooltip">Customer</span>
+        </router-link>
+
         <!-- Operations Section -->
         <div class="mt-6">
           <div v-if="!isCollapsed" class="px-2 mb-2">
