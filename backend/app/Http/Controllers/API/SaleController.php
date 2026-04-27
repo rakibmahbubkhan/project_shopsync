@@ -69,6 +69,7 @@ public function store(StoreSaleRequest $request)
                 'sale_date'      => $request->sale_date,
                 'payment_method' => $request->payment_method,
                 'payment_status' => $request->payment_status,
+                'paid_amount'    => $request->paid_amount ?? 0,
                 'discount'       => $request->discount ?? 0,
                 'tax'            => $request->tax ?? 0,
                 'total_amount'   => 0,

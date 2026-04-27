@@ -198,14 +198,29 @@
             </select>
           </div>
           
-          <div>
-            <label class="block text-xs font-medium text-gray-700 mb-1">Delivery Status *</label>
-            <select v-model="deliveryStatus" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500 text-sm">
-              <option value="delivered">Delivered</option>
-              <option value="pending">Pending</option>
-              <option value="processing">Processing</option>
-            </select>
-          </div>
+          <div class="border-t border-gray-200 p-3 sm:p-4 space-y-3 flex-shrink-0">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Payment Status</label>
+                <select v-model="paymentStatus" disabled class="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm appearance-none">
+                  <option value="pending">Pending</option>
+                  <option value="partial">Partial</option>
+                  <option value="paid">Paid</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Paid Amount (৳)</label>
+                <input
+                  v-model.number="paidAmount"
+                  type="number"
+                  @input="updatePaymentStatus"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500 text-sm"
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+            </div>
         </div>
         
         <!-- Cart Items -->
@@ -381,6 +396,8 @@ const productsLoading = ref(false);
 const loadingMore = ref(false);
 const recentProductsLoading = ref(false);
 const discount = ref(0);
+const paidAmount = ref(0);
+const paymentStatus = ref('pending');
 
 // Pagination
 const currentPage = ref(1);
@@ -605,6 +622,17 @@ const scanBarcode = () => {
   alert("Please scan barcode using your barcode scanner");
 };
 
+// Logic to define status based on amount typed
+const updatePaymentStatus = () => {
+  if (paidAmount.value <= 0) {
+    paymentStatus.value = 'pending';
+  } else if (paidAmount.value < total.value) {
+    paymentStatus.value = 'partial';
+  } else {
+    paymentStatus.value = 'paid';
+  }
+};
+
 // Add to Cart
 const addToCart = (product) => {
   if (!product) return;
@@ -714,7 +742,9 @@ const checkout = async () => {
       warehouse_id: selectedWarehouse.value,
       sale_date: new Date().toISOString().split('T')[0],
       payment_method: paymentMethod.value,
-      payment_status: 'paid',
+      // payment_status: 'paid',
+      paid_amount: paidAmount.value,
+      payment_status: paymentStatus.value,
       tax: tax.value,
       discount: discount.value,
       reference_number: referenceNumber.value || null,

@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
+
 
 class Sale extends Model
 {
@@ -35,21 +37,15 @@ class Sale extends Model
         'gross_profit' => 'decimal:2',
     ];
     
-    /**
-     * Override the default timestamps behavior
-     */
     public $timestamps = true;
     
-    /**
-     * Set only created_at on insert, updated_at will be null
-     */
     protected static function boot()
     {
         parent::boot();
         
         static::creating(function ($model) {
             $model->created_at = $model->freshTimestamp();
-            $model->updated_at = null; // Explicitly set to null
+            $model->updated_at = null;
         });
         
         static::updating(function ($model) {
@@ -59,15 +55,12 @@ class Sale extends Model
 
     public function setUpdatedAt($value)
     {
-        // Only set the value if the record already exists (is an update)
         if ($this->exists) {
             $this->{static::UPDATED_AT} = $value;
         }
-
         return $this;
     }
     
-    // Rest of your relationships...
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
@@ -91,5 +84,70 @@ class Sale extends Model
     public function returns(): HasMany
     {
         return $this->hasMany(SaleReturn::class);
+    }
+    
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+    
+    /**
+     * Get the due amount for this sale
+     */
+    public function getDueAmountAttribute()
+    {
+        return max(0, $this->total_amount - $this->paid_amount);
+    }
+    
+    /**
+ * Update payment status based on paid amount
+ */
+public function updatePaymentStatus()
+{
+    if ($this->paid_amount >= $this->total_amount) {
+        $this->payment_status = 'paid';
+    } elseif ($this->paid_amount > 0) {
+        $this->payment_status = 'partial';
+    } else {
+        $this->payment_status = 'unpaid';
+    }
+    $this->saveQuietly(); // Save without triggering events
+}
+    
+    /**
+     * Record a payment
+     */
+    public function recordPayment($amount, $paymentMethod, $processedBy, $referenceNumber = null, $notes = null)
+    {
+        if ($amount <= 0) {
+            throw new \Exception('Payment amount must be greater than zero');
+        }
+        
+        if ($amount > $this->due_amount) {
+            throw new \Exception('Payment amount exceeds due amount');
+        }
+        
+        DB::transaction(function () use ($amount, $paymentMethod, $processedBy, $referenceNumber, $notes) {
+            // Create payment record
+            $payment = Payment::create([
+                'sale_id' => $this->id,
+                'customer_id' => $this->customer_id,
+                'amount' => $amount,
+                'payment_method' => $paymentMethod,
+                'payment_status' => 'completed',
+                'reference_number' => $referenceNumber,
+                'notes' => $notes,
+                'processed_by' => $processedBy,
+            ]);
+            
+            // Update sale paid amount
+            $this->paid_amount += $amount;
+            $this->save();
+            
+            // Update payment status
+            $this->updatePaymentStatus();
+        });
+        
+        return true;
     }
 }

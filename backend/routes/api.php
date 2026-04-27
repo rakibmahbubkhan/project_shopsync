@@ -117,6 +117,7 @@ use App\Http\Controllers\API\BrandController;
 use App\Http\Controllers\API\UnitController;
 use App\Http\Controllers\API\TaxController;
 use App\Http\Controllers\API\VariantController;
+use App\Http\Controllers\API\PaymentController;
 
 // Public Auth Routes
 Route::post('/login', [AuthController::class, 'login']);
@@ -195,6 +196,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Additional routes
     Route::patch('customers/{id}/status', [CustomerController::class, 'updateStatus']);
+
+    // Payment routes
+    Route::prefix('payments')->group(function () {
+        Route::post('/', [PaymentController::class, 'store']);
+        Route::post('/bulk', [PaymentController::class, 'bulkStore']);
+        Route::get('/history/{saleId}', [PaymentController::class, 'history']);
+    });
+
 
     Route::apiResource('warehouses', WarehouseController::class);
 
