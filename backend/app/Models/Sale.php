@@ -20,6 +20,7 @@ class Sale extends Model
         'discount',
         'tax',
         'total_amount',
+        'paid_amount',
         'total_cogs',
         'gross_profit',
     ];
@@ -29,6 +30,7 @@ class Sale extends Model
         'discount' => 'decimal:2',
         'tax' => 'decimal:2',
         'total_amount' => 'decimal:2',
+        'paid_amount' => 'decimal:2',
         'total_cogs' => 'decimal:2',
         'gross_profit' => 'decimal:2',
     ];
