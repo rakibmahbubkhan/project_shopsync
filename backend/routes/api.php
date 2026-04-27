@@ -184,7 +184,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('audit-logs', [AuditLogController::class, 'index']);
 
     // 10. Customers & Warehouses
+    // Customer routes - Place specific routes BEFORE the resource route
+    Route::prefix('customers')->group(function () {
+        Route::get('pending-payments', [CustomerController::class, 'pendingPayments']);
+        Route::get('pending-payments/count', [CustomerController::class, 'pendingPaymentsCount']);
+    });
+
+    // Resource routes
     Route::apiResource('customers', CustomerController::class);
+
+    // Additional routes
+    Route::patch('customers/{id}/status', [CustomerController::class, 'updateStatus']);
+
     Route::apiResource('warehouses', WarehouseController::class);
 
     // 11. POS Init Data
@@ -198,6 +209,7 @@ Route::middleware('auth:sanctum')->group(function () {
             'variants' => \App\Models\Variant::with('items')->get(),
         ]);
     });
+
 });
 
 // Debug route (keep at the bottom)

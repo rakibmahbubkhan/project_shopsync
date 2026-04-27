@@ -13,9 +13,10 @@ const routes = [
       // User Management
       { path: 'users', name: 'users', component: () => import('@/views/users/UserManagement.vue') },
       { path: 'customers', name: 'customers', component: () => import('@/views/customers/CustomerList.vue') },
+      { path: '/customers/pending', name: 'PendingPayments', component: () => import('@/views/customers/PendingPayments.vue'), meta: { requiresAuth: true, layout: 'AdminLayout' } },
 
       // Products & Inventory
-      { path: 'products', name: 'products', component: () => import('@/views/products/ProductList.vue') },
+      { path: 'products', name: 'products', component: () => import('@/views/Products/ProductList.vue') },
       { path: 'categories', name: 'categories', component: () => import('@/views/inventory/CategoryList.vue')},
       { path: 'brands', name: 'brands', component: () => import('@/views/inventory/BrandList.vue')},
       { path: 'units', name: 'units', component: () => import('@/views/inventory/UnitList.vue')},

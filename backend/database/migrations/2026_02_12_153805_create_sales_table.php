@@ -13,6 +13,7 @@ return new class extends Migration
             $table->foreignId('customer_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('warehouse_id')->constrained()->cascadeOnDelete();
             $table->decimal('total_amount', 15, 2);
+            $table->decimal('paid_amount', 12, 2)->default(0);
             $table->decimal('discount', 15, 2)->default(0);
             $table->decimal('tax', 15, 2)->default(0);
             $table->enum('payment_method', ['cash', 'card', 'bank', 'mobile'])->default('cash');

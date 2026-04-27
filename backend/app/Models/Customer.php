@@ -24,6 +24,17 @@ class Customer extends Model
         'shipping_country',
         'shipping_city',
         'description',
-        'logo'
+        'logo',
+        'status'
     ];
+    
+    protected $attributes = [
+        'status' => 'active',  
+    ];
+    
+    // Add this relationship
+    public function sales()
+    {
+        return $this->hasMany(Sale::class);
+    }
 }

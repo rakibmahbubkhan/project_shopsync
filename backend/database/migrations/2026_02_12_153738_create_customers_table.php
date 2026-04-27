@@ -27,7 +27,10 @@ return new class extends Migration
         $table->string('shipping_country')->nullable();
         $table->string('shipping_city')->nullable();
         $table->text('description')->nullable();
+        $table->enum('status', ['active', 'inactive'])->default('active');
+
         $table->string('logo')->nullable();
+
         $table->timestamps();
 });
     }

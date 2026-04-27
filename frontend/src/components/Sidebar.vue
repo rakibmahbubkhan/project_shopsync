@@ -131,18 +131,46 @@
           </div>
         </div>
 
-        <!-- Customer -->
-        <router-link 
-          :to="'/customers'" 
-          class="nav-item group" 
-          active-class="active" 
-          :class="{ 'justify-center': isCollapsed }"
-        >
-          <span class="icon text-lg">👥</span>
-          <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm font-medium">Customer</span>
-          <span v-if="!isCollapsed" class="badge-modern from-blue-500 to-indigo-500">New</span>
-          <span v-if="isCollapsed" class="tooltip">Customer</span>
-        </router-link>
+        <!-- Customers with Collapsible Submenu -->
+        <div class="space-y-1">
+          <button 
+            @click="toggleCustomersMenu"
+            class="nav-item group w-full flex items-center" 
+            :class="{ 
+              'justify-center': isCollapsed, 
+              'bg-white/10 text-white': isCustomersOpen 
+            }"
+          >
+            <span class="icon text-lg">👥</span>
+            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm text-left">Customers</span>
+            <!-- Show badge with pending count if there are pending customers -->
+            <span v-if="!isCollapsed && pendingCount > 0" class="badge-modern from-red-500 to-orange-500">{{ pendingCount }}</span>
+            <svg 
+              v-if="!isCollapsed" 
+              class="w-4 h-4 transition-transform duration-300" 
+              :class="{ 'rotate-180': isCustomersOpen }" 
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+            <span v-if="isCollapsed" class="tooltip">Customers</span>
+          </button>
+
+          <!-- Customer Submenu Items -->
+          <div v-if="!isCollapsed && isCustomersOpen" class="pl-10 space-y-1 mt-1">
+            <router-link to="/customers" class="sub-nav-item" active-class="active-sub">
+              Customer List
+            </router-link>
+            <router-link to="/customers/pending" class="sub-nav-item" active-class="active-sub">
+              <div class="flex items-center justify-between">
+                <span>Pending Payments</span>
+                <span v-if="pendingCount > 0" class="px-1.5 py-0.5 bg-red-500/20 text-red-400 rounded-full text-[10px] font-bold">
+                  {{ pendingCount }}
+                </span>
+              </div>
+            </router-link>
+          </div>
+        </div>
 
         <!-- Operations Section -->
         <div class="mt-6">
@@ -252,6 +280,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import { useSidebarStore } from '@/stores/sidebarStore';
+import api from "@/api/axios";
 
 const emit = defineEmits(['toggle']);
 
@@ -265,14 +294,47 @@ const isCollapsed = computed(() => sidebarStore.isCollapsed);
 // Inventory submenu state
 const isInventoryOpen = ref(false);
 
-// Load saved state from localStorage
+// Customers submenu state
+const isCustomersOpen = ref(false);
+
+// Pending customers count
+const pendingCount = ref(0);
+
+// Fetch pending customers count
+const fetchPendingCount = async () => {
+  try {
+    const response = await api.get('/customers/pending-payments/count');
+    pendingCount.value = response.data.count || 0;
+  } catch (error) {
+    console.warn("Could not fetch pending payments count:", error.message);
+    pendingCount.value = 0;
+  }
+};
+
+// Load saved states from localStorage
 onMounted(() => {
   sidebarStore.loadState();
-  // Load inventory menu state from localStorage
+  
+  // Load inventory menu state
   const savedInventoryState = localStorage.getItem('inventoryMenuOpen');
   if (savedInventoryState !== null) {
     isInventoryOpen.value = JSON.parse(savedInventoryState);
   }
+  
+  // Load customers menu state
+  const savedCustomersState = localStorage.getItem('customersMenuOpen');
+  if (savedCustomersState !== null) {
+    isCustomersOpen.value = JSON.parse(savedCustomersState);
+  }
+  
+  // Fetch pending count
+  fetchPendingCount();
+  
+  // Refresh pending count every 30 seconds
+  const interval = setInterval(fetchPendingCount, 30000);
+  
+  // Cleanup interval on component unmount
+  return () => clearInterval(interval);
 });
 
 // Watch for changes and emit
@@ -293,12 +355,24 @@ const toggleInventoryMenu = () => {
   }
 };
 
+// Toggle customers submenu
+const toggleCustomersMenu = () => {
+  if (!isCollapsed.value) {
+    isCustomersOpen.value = !isCustomersOpen.value;
+    localStorage.setItem('customersMenuOpen', JSON.stringify(isCustomersOpen.value));
+  }
+};
+
 const isAdmin = computed(() => {
   return auth.user?.role_id === 1 || auth.user?.role === 'admin';
 });
 
 const userName = computed(() => auth.user?.name || 'User');
-const userRole = computed(() => auth.user?.role?.name || 'Guest');
+const userRole = computed(() => {
+  if (auth.user?.role?.name) return auth.user.role.name;
+  if (typeof auth.user?.role === 'string') return auth.user.role;
+  return 'Guest';
+});
 const userInitial = computed(() => userName.value.charAt(0).toUpperCase());
 
 // Menu items configuration
@@ -325,7 +399,6 @@ const handleLogout = async () => {
     console.error('Logout failed:', error);
   }
 };
-
 </script>
 
 <style scoped>
