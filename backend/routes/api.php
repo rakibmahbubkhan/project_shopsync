@@ -110,6 +110,7 @@ use App\Http\Controllers\API\StockAdjustmentController;
 use App\Http\Controllers\API\FinancialReportController;
 use App\Http\Controllers\API\ReportController;
 use App\Http\Controllers\API\ReturnController;
+use App\Http\Controllers\API\PurchaseReturnController;
 use App\Http\Controllers\API\AuditLogController;
 use App\Http\Controllers\API\CustomerController;
 use App\Http\Controllers\API\WarehouseController;
@@ -162,6 +163,17 @@ Route::middleware('auth:sanctum')->group(function () {
     // 4. Purchases & Suppliers
     Route::apiResource('suppliers', SupplierController::class);
     Route::apiResource('purchases', PurchaseController::class); 
+
+    // Purchases Returns
+     Route::prefix('purchase-returns')->group(function () {
+        Route::get('/', [PurchaseReturnController::class, 'index']);
+        Route::get('/search-purchases', [PurchaseReturnController::class, 'searchPurchases']);
+        Route::get('/stats', [PurchaseReturnController::class, 'stats']);
+        Route::post('/', [PurchaseReturnController::class, 'store']);
+        Route::get('/{id}', [PurchaseReturnController::class, 'show']);
+        Route::post('/{id}/approve', [PurchaseReturnController::class, 'approve']);
+        Route::post('/{id}/reject', [PurchaseReturnController::class, 'reject']);
+    });
 
     Route::post('purchases/{purchase}/receive', [PurchaseController::class, 'receive']);
     Route::post('purchases/{purchase}/payments', [PurchaseController::class, 'addPayment']);

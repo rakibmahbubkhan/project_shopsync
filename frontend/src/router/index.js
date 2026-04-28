@@ -33,6 +33,9 @@ const routes = [
       { path: 'purchases', name: 'purchases', component: () => import('@/views/purchases/PurchaseList.vue') },
       { path: 'purchases/create', name: 'purchase-create', component: () => import('@/views/purchases/PurchaseCreate.vue') },
       { path: 'purchases/:id/edit', name: 'purchase-edit', component: () => import('@/views/purchases/PurchaseCreate.vue') },
+      // Add these routes
+      { path: '/purchases/returns', name: 'purchase-returns', component: () => import('@/views/purchases/PurchaseReturnList.vue'), meta: { requiresAuth: true } },
+      { path: '/purchases/returns/create', name: 'purchase-return-create', component: () => import('@/views/purchases/PurchaseReturnCreate.vue'), meta: { requiresAuth: true } },
 
       { path: 'suppliers', name: 'suppliers', component: () => import('@/views/suppliers/SupplierList.vue')},
       { path: 'warehouses', name: 'warehouses', component: () => import('@/views/warehouses/WarehouseList.vue')},

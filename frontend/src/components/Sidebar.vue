@@ -215,27 +215,41 @@
           </div>
 
           <!-- Purchases -->
-          <router-link 
-            :to="'/purchases'" 
-            class="nav-item group" 
-            active-class="active" 
-            :class="{ 'justify-center': isCollapsed }"
-          >
-            <span class="icon text-lg">📋</span>
-            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm font-medium">Purchase List</span>
-            <span v-if="isCollapsed" class="tooltip">Purchase List</span>
-          </router-link>
+          <div class="space-y-1">
+            <button 
+              @click="togglePurchasesMenu"
+              class="nav-item group w-full flex items-center" 
+              :class="{ 
+                'justify-center': isCollapsed, 
+                'bg-white/10 text-white': isPurchasesOpen 
+              }"
+            >
+              <span class="icon text-lg">📋</span>
+              <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm text-left">Purchases</span>
+              <svg 
+                v-if="!isCollapsed" 
+                class="w-4 h-4 transition-transform duration-300" 
+                :class="{ 'rotate-180': isPurchasesOpen }" 
+                fill="none" stroke="currentColor" viewBox="0 0 24 24"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+              <span v-if="isCollapsed" class="tooltip">Purchases</span>
+            </button>
 
-          <router-link 
-            :to="'/purchases/create'" 
-            class="nav-item group" 
-            active-class="active" 
-            :class="{ 'justify-center': isCollapsed }"
-          >
-            <span class="icon text-lg">📦</span>
-            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm font-medium">New Purchase</span>
-            <span v-if="isCollapsed" class="tooltip">New Purchase</span>
-          </router-link>
+            <!-- Purchases Submenu Items -->
+            <div v-if="!isCollapsed && isPurchasesOpen" class="pl-10 space-y-1 mt-1">
+              <router-link to="/purchases" class="sub-nav-item" active-class="active-sub">
+                Purchase List
+              </router-link>
+              <router-link to="/purchases/create" class="sub-nav-item" active-class="active-sub">
+                New Purchase
+              </router-link>
+              <router-link to="/purchases/returns" class="sub-nav-item" active-class="active-sub">
+                Purchase Returns
+              </router-link>
+            </div>
+          </div>
 
           <router-link 
             :to="'/suppliers'" 
@@ -484,6 +498,23 @@ const handleLogout = async () => {
     router.push('/login');
   } catch (error) {
     console.error('Logout failed:', error);
+  }
+};
+
+// In the state declarations
+const isPurchasesOpen = ref(false);
+
+// In the onMounted
+const savedPurchasesState = localStorage.getItem('purchasesMenuOpen');
+if (savedPurchasesState !== null) {
+  isPurchasesOpen.value = JSON.parse(savedPurchasesState);
+}
+
+// Toggle function
+const togglePurchasesMenu = () => {
+  if (!isCollapsed.value) {
+    isPurchasesOpen.value = !isPurchasesOpen.value;
+    localStorage.setItem('purchasesMenuOpen', JSON.stringify(isPurchasesOpen.value));
   }
 };
 </script>

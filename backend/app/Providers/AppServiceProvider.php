@@ -9,6 +9,7 @@ use App\Policies\PurchasePolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use App\Services\ReturnService;
+use App\Services\PurchaseReturnService;
 
 
 class AppServiceProvider extends ServiceProvider
@@ -20,6 +21,10 @@ class AppServiceProvider extends ServiceProvider
     {
          $this->app->singleton(ReturnService::class, function ($app) {
             return new ReturnService();
+        });
+
+         $this->app->singleton(PurchaseReturnService::class, function ($app) {
+            return new PurchaseReturnService();
         });
     }
 
