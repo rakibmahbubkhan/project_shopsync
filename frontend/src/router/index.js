@@ -26,7 +26,6 @@ const routes = [
       // Sales & Returns
       { path: 'sales', name: 'sales', component: () => import('@/views/sales/SalesListView.vue') },
       { path: 'sales/returns', name: 'sales-returns', component: () => import('@/views/sales/ReturnListView.vue') },
-      // { path: 'sales/return', name: 'return-create', component: () => import('@/views/sales/ReturnCreate.vue') },
       { path: 'sales/:id', name: 'sale-details', component: () => import('@/views/sales/SaleDetailsView.vue') },
       { path: '/sales/returns/create',name: 'return-create',component: () => import('@/views/sales/ReturnCreate.vue'), meta: { requiresAuth: true } },
 

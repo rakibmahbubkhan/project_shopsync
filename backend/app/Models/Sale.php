@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 class Sale extends Model
 {
     protected $table = 'sales';
+    protected $with = [];
     
     protected $fillable = [
         'customer_id',

@@ -409,6 +409,25 @@
         </div>
       </template>
 
+
+      <!-- Error Alert - Add this right before the closing </div> of the container -->
+      <div v-if="errorMessage" class="fixed top-4 right-4 z-50 animate-slide-in-right">
+        <div class="bg-red-500 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 max-w-md">
+          <svg class="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <div class="flex-1">
+            <p class="font-semibold text-sm">Error</p>
+            <p class="text-sm text-red-100">{{ errorMessage }}</p>
+          </div>
+          <button @click="errorMessage = ''" class="ml-auto text-red-200 hover:text-white">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
     </div>
 
     <!-- Success Modal -->
@@ -506,6 +525,7 @@ const showSuccessModal = ref(false);
 const showConfirmDialog = ref(false);
 const completedReturnId = ref(null);
 const completedReturnAmount = ref(0);
+const errorMessage = ref('');
 
 // Form
 const returnQuantities = ref({});
@@ -585,7 +605,6 @@ const getQuickQuantities = (max) => {
   if (max >= 2) quantities.push(2);
   if (max >= 5) quantities.push(5);
   if (max >= 10) quantities.push(10);
-  // Filter out duplicates and sort
   return [...new Set(quantities)].sort((a, b) => a - b);
 };
 
@@ -609,6 +628,7 @@ const startNewReturn = () => {
   formErrors.reason = '';
   loadingSale.value = true;
   loadError.value = '';
+  errorMessage.value = '';
   loadSale();
 };
 
@@ -699,7 +719,6 @@ const loadSale = async () => {
     if (found) {
       sale.value = found;
     } else {
-      // Try direct sale endpoint
       const saleResponse = await api.get(`/sales/${saleId}`);
       const saleData = saleResponse.data.data || saleResponse.data;
       sale.value = {
@@ -714,21 +733,19 @@ const loadSale = async () => {
       };
     }
     
-    // Initialize quantities
     sale.value.items.forEach(item => {
       returnQuantities.value[item.id] = 0;
     });
     
   } catch (error) {
     console.error('Failed to load sale:', error);
-    loadError.value = error.response?.data?.message || 'Failed to load sale details. The sale may not exist or has no returnable items.';
+    loadError.value = error.response?.data?.message || 'Failed to load sale details.';
   } finally {
     loadingSale.value = false;
   }
 };
 
 const processReturn = () => {
-  // Validate
   if (!form.reason.trim()) {
     formErrors.reason = 'Please provide a reason for the return';
     return;
@@ -745,18 +762,25 @@ const processReturn = () => {
 const confirmProcessReturn = async () => {
   showConfirmDialog.value = false;
   submitting.value = true;
+  errorMessage.value = '';
 
   const items = sale.value.items
     .filter(item => (returnQuantities.value[item.id] || 0) > 0)
     .map(item => ({
       product_id: item.product_id,
-      quantity: returnQuantities.value[item.id],
-      discount: 0,
-      tax: 0
+      quantity: returnQuantities.value[item.id]
     }));
 
   try {
-    const { data } = await api.post('/returns', {
+    console.log('📤 Sending return request:', {
+      sale_id: sale.value.id,
+      items_count: items.length,
+      items: items,
+      reason: form.reason,
+      refund_method: form.refund_method
+    });
+
+    const response = await api.post('/returns', {
       sale_id: sale.value.id,
       items: items,
       reason: form.reason,
@@ -764,13 +788,26 @@ const confirmProcessReturn = async () => {
       refund_method: form.refund_method
     });
 
-    completedReturnId.value = data.data?.id || 'N/A';
+    console.log('✅ Return response:', response.data);
+
+    completedReturnId.value = response.data.data?.id || 'N/A';
     completedReturnAmount.value = totalRefundAmount.value;
     showSuccessModal.value = true;
     
   } catch (error) {
-    console.error('Return failed:', error);
-    alert(error.response?.data?.message || 'Failed to process return. Please try again.');
+    console.error('❌ Return failed:', error);
+    console.error('Error details:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status
+    });
+    
+    errorMessage.value = error.response?.data?.message || 
+                         error.response?.data?.error ||
+                         error.message ||
+                         'Failed to process return. Please try again.';
+    
+    alert(errorMessage.value);
   } finally {
     submitting.value = false;
   }

@@ -729,6 +729,7 @@ const toast = reactive({
 let searchTimeout = null;
 let saleSearchTimeout = null;
 let fullReturnTimeout = null;
+let abortController = null; // For cancelling previous requests
 
 // ==================== COMPUTED ====================
 // (none needed currently)
@@ -802,6 +803,11 @@ const loadReturns = async () => {
       date_to: filters.date_to || undefined
     };
 
+    // Remove undefined params
+    Object.keys(params).forEach(key => {
+      if (params[key] === undefined) delete params[key];
+    });
+
     const { data } = await api.get('/returns', { params });
     
     returns.value = data.data || [];
@@ -828,52 +834,201 @@ const loadReturns = async () => {
   }
 };
 
+/**
+ * FIXED: Search sales with proper abort controller and error handling
+ */
 const searchSales = async () => {
+  // Cancel previous request if exists
+  if (abortController) {
+    abortController.abort();
+  }
+
+  // Clear previous timeout
   clearTimeout(saleSearchTimeout);
-  
-  if (saleSearchQuery.value.length < 2) {
+
+  // If search query is too short, clear results
+  if (!saleSearchQuery.value || saleSearchQuery.value.trim().length < 2) {
     saleSearchResults.value = [];
+    searchingSales.value = false;
     return;
   }
-  
+
   searchingSales.value = true;
+
   saleSearchTimeout = setTimeout(async () => {
+    // Create new AbortController for this request
+    abortController = new AbortController();
+
     try {
-      const { data } = await api.get('/returns/search-sales', {
-        params: { search: saleSearchQuery.value }
-      });
-      saleSearchResults.value = data || [];
+      const searchTerm = saleSearchQuery.value.trim();
+      
+      console.log('🔍 Searching sales with term:', searchTerm);
+      
+      // FIX: Try both endpoints to find which one works
+      let response;
+      
+      try {
+        // First try the dedicated search-sales endpoint
+        response = await api.get('/returns/search-sales', {
+          params: { search: searchTerm },
+          signal: abortController.signal
+        });
+      } catch (firstError) {
+        console.warn('First endpoint failed, trying fallback:', firstError.message);
+        
+        // Fallback: Search directly via sales endpoint
+        response = await api.get('/sales', {
+          params: { 
+            search: searchTerm,
+            per_page: 20 
+          },
+          signal: abortController.signal
+        });
+      }
+
+      console.log('📦 API Response:', response.data);
+
+      // Handle different response structures
+      let results = [];
+      
+      if (Array.isArray(response.data)) {
+        // Direct array response
+        results = response.data;
+      } else if (response.data.data && Array.isArray(response.data.data)) {
+        // Laravel paginated response with data key
+        results = response.data.data;
+      } else if (response.data.data && response.data.data.data && Array.isArray(response.data.data.data)) {
+        // Nested paginated response
+        results = response.data.data.data;
+      } else if (response.data.sales && Array.isArray(response.data.sales)) {
+        // Sales key
+        results = response.data.sales;
+      } else if (Array.isArray(response.data.results)) {
+        // Results key
+        results = response.data.results;
+      }
+
+      console.log('✅ Processed results:', results.length, 'sales found');
+
+      // Transform results if they came from sales endpoint
+      if (results.length > 0 && results[0].items && !results[0].available_for_return) {
+        // Map sales to the expected format
+        results = results.map(sale => ({
+          id: sale.id,
+          sale_date: sale.sale_date,
+          total_amount: sale.total_amount,
+          paid_amount: sale.paid_amount || 0,
+          payment_status: sale.payment_status,
+          customer: sale.customer ? {
+            id: sale.customer.id,
+            name: sale.customer.name,
+            mobile_number: sale.customer.mobile_number || sale.customer.phone || ''
+          } : null,
+          warehouse: sale.warehouse ? {
+            id: sale.warehouse.id,
+            name: sale.warehouse.name
+          } : null,
+          items: (sale.items || []).map(item => ({
+            id: item.id,
+            product_id: item.product_id,
+            product_name: item.product?.name || 'Product',
+            product_sku: item.product?.sku || 'N/A',
+            quantity: item.quantity,
+            already_returned: 0, // Will need proper calculation
+            available_for_return: item.quantity, // Assume all available initially
+            selling_price: item.selling_price,
+            cost_price: item.cost_price || 0
+          }))
+        }));
+      }
+
+      saleSearchResults.value = results;
+
+      if (results.length === 0) {
+        console.log('ℹ️ No sales found for term:', searchTerm);
+      }
+
     } catch (error) {
-      console.error('Sale search failed:', error);
+      // Ignore abort errors
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
+        console.log('🛑 Search request cancelled');
+        return;
+      }
+      
+      console.error('❌ Sale search failed:', error);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      
       saleSearchResults.value = [];
+      
+      // Show error toast for non-abort errors
+      if (error.response?.status === 404) {
+        showToast('Search endpoint not found. Please check API routes.', 'error');
+      } else if (error.response?.status === 500) {
+        showToast('Server error while searching. Please try again.', 'error');
+      }
     } finally {
       searchingSales.value = false;
+      abortController = null;
     }
-  }, 400);
+  }, 500); // 500ms debounce
 };
 
+/**
+ * FIXED: Same improvements for full return search
+ */
 const searchSalesForFullReturn = async () => {
   clearTimeout(fullReturnTimeout);
   
-  if (fullReturnSearchQuery.value.length < 2) {
+  if (!fullReturnSearchQuery.value || fullReturnSearchQuery.value.trim().length < 2) {
     fullReturnResults.value = [];
     return;
   }
   
   searchingFullReturn.value = true;
+  
   fullReturnTimeout = setTimeout(async () => {
     try {
-      const { data } = await api.get('/returns/search-sales', {
-        params: { search: fullReturnSearchQuery.value }
-      });
-      fullReturnResults.value = data || [];
+      const searchTerm = fullReturnSearchQuery.value.trim();
+      
+      console.log('🔍 Full return search:', searchTerm);
+      
+      // Try dedicated endpoint first, fallback to sales endpoint
+      let response;
+      try {
+        response = await api.get('/returns/search-sales', {
+          params: { search: searchTerm }
+        });
+      } catch (firstError) {
+        console.warn('First endpoint failed, trying fallback');
+        response = await api.get('/sales', {
+          params: { search: searchTerm, per_page: 20 }
+        });
+      }
+
+      // Handle different response structures
+      let results = [];
+      if (Array.isArray(response.data)) {
+        results = response.data;
+      } else if (response.data.data && Array.isArray(response.data.data)) {
+        results = response.data.data;
+      } else if (response.data.data?.data && Array.isArray(response.data.data.data)) {
+        results = response.data.data.data;
+      }
+
+      fullReturnResults.value = results;
+      console.log('✅ Full return search results:', results.length);
+      
     } catch (error) {
-      console.error('Sale search failed:', error);
+      console.error('❌ Full return search failed:', error);
       fullReturnResults.value = [];
     } finally {
       searchingFullReturn.value = false;
     }
-  }, 400);
+  }, 500);
 };
 
 const approveReturn = async (ret) => {
@@ -921,7 +1076,7 @@ const processFullReturn = async (sale) => {
   try {
     const items = sale.items.map(item => ({
       product_id: item.product_id,
-      quantity: item.available_for_return,
+      quantity: item.available_for_return || item.quantity,
       discount: 0,
       tax: 0
     }));
@@ -1012,6 +1167,9 @@ onBeforeUnmount(() => {
   clearTimeout(searchTimeout);
   clearTimeout(saleSearchTimeout);
   clearTimeout(fullReturnTimeout);
+  if (abortController) {
+    abortController.abort();
+  }
 });
 </script>
 

@@ -43,6 +43,8 @@ class DatabaseSeeder extends Seeder
             PurchasesTableSeeder::class,
             SalesTableSeeder::class,
             SaleItemsTableSeeder::class,
+            SaleReturnSeeder::class,        
+            SaleReturnDemoSeeder::class,
             ProductStocksTableSeeder::class,
         ]);
     }
