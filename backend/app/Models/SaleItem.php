@@ -29,21 +29,11 @@ class SaleItem extends Model
         'updated_at' => 'datetime',
     ];
     
-    // Override the boot method to handle timestamps manually
-    protected static function boot()
-    {
-        parent::boot();
-        
-        static::creating(function ($model) {
-            $model->created_at = now();
-            // Don't set updated_at on creation
-            $model->updated_at = null;
-        });
-        
-        static::updating(function ($model) {
-            $model->updated_at = now();
-        });
-    }
+    /**
+     * FIXED: Removed custom boot methods that manually set timestamps
+     * Let Eloquent handle timestamps automatically via $timestamps property
+     */
+    // REMOVED the custom static::creating and static::updating
     
     public function sale(): BelongsTo
     {

@@ -48,24 +48,24 @@ class StockLog extends Model
     }
 
     // Accessors
-    public function getFormattedQuantityAttribute(): string
+    public function getFormattedQuantityAttribute($value): string
     {
-        return number_format($this->quantity, 2);
+        return number_format($value, 2);
     }
 
-    public function getFormattedOldQuantityAttribute(): string
+    public function getFormattedOldQuantityAttribute($value): string
     {
-        return number_format($this->old_quantity, 2);
+        return number_format($value, 2);
     }
 
-    public function getFormattedNewQuantityAttribute(): string
+    public function getFormattedNewQuantityAttribute($value): string
     {
-        return number_format($this->new_quantity, 2);
+        return number_format($value, 2);
     }
 
-    public function getFormattedCostPriceAttribute(): string
+    public function getFormattedCostPriceAttribute($value): string
     {
-        return number_format($this->cost_price, 2);
+        return number_format($value, 2);
     }
 
     // Scopes

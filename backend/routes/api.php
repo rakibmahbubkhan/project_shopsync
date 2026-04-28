@@ -175,10 +175,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('returns')->group(function () {
         Route::get('/', [ReturnController::class, 'index']);
         Route::get('/search-sales', [ReturnController::class, 'searchSales']);
+        Route::get('/stats', [ReturnController::class, 'stats']);
         Route::post('/', [ReturnController::class, 'store']);
-        Route::get('/{saleReturn}', [ReturnController::class, 'show']);
-        Route::post('/{saleReturn}/approve', [ReturnController::class, 'approve']);
-        Route::post('/{saleReturn}/reject', [ReturnController::class, 'reject']);
+        Route::get('/{id}', [ReturnController::class, 'show']);
+        Route::post('/{id}/approve', [ReturnController::class, 'approve']);
+        Route::post('/{id}/reject', [ReturnController::class, 'reject']);
     });
 
     // 7. Accounting & Financial Reports

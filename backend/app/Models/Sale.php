@@ -6,12 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\DB;
-
+    
 
 class Sale extends Model
 {
     protected $table = 'sales';
-    protected $with = [];
     
     protected $fillable = [
         'customer_id',
@@ -40,27 +39,34 @@ class Sale extends Model
     
     public $timestamps = true;
     
+    /**
+     * IMPORTANT: Empty $with to prevent auto-loading
+     */
+    protected $with = [];
+    protected $hidden = [];
+    
     protected static function boot()
     {
         parent::boot();
         
         static::creating(function ($model) {
-            $model->created_at = $model->freshTimestamp();
-            $model->updated_at = null;
+            if (!isset($model->attributes['created_at'])) {
+                $model->setCreatedAt($model->freshTimestamp());
+            }
         });
         
         static::updating(function ($model) {
-            $model->updated_at = $model->freshTimestamp();
+            if (!isset($model->attributes['updated_at'])) {
+                $model->setUpdatedAt($model->freshTimestamp());
+            }
         });
     }
-
-    public function setUpdatedAt($value)
-    {
-        if ($this->exists) {
-            $this->{static::UPDATED_AT} = $value;
-        }
-        return $this;
-    }
+    
+    /**
+     * FIXED: Remove the custom setUpdatedAt override
+     * Let Eloquent handle timestamps naturally
+     */
+    // REMOVED the custom setUpdatedAt method
     
     public function customer(): BelongsTo
     {
@@ -82,7 +88,11 @@ class Sale extends Model
         return $this->hasMany(SaleItem::class);
     }
     
-    public function returns(): HasMany
+    /**
+     * FIXED: Renamed from 'returns' to 'saleReturns' 
+     * to avoid any potential naming collisions
+     */
+    public function saleReturns(): HasMany
     {
         return $this->hasMany(SaleReturn::class);
     }
@@ -92,32 +102,23 @@ class Sale extends Model
         return $this->hasMany(Payment::class);
     }
     
-    /**
-     * Get the due amount for this sale
-     */
     public function getDueAmountAttribute()
     {
         return max(0, $this->total_amount - $this->paid_amount);
     }
     
-    /**
- * Update payment status based on paid amount
- */
-public function updatePaymentStatus()
-{
-    if ($this->paid_amount >= $this->total_amount) {
-        $this->payment_status = 'paid';
-    } elseif ($this->paid_amount > 0) {
-        $this->payment_status = 'partial';
-    } else {
-        $this->payment_status = 'unpaid';
+    public function updatePaymentStatus(): void
+    {
+        if ($this->paid_amount >= $this->total_amount) {
+            $this->payment_status = 'paid';
+        } elseif ($this->paid_amount > 0) {
+            $this->payment_status = 'partial';
+        } else {
+            $this->payment_status = 'unpaid';
+        }
+        $this->saveQuietly();
     }
-    $this->saveQuietly(); // Save without triggering events
-}
     
-    /**
-     * Record a payment
-     */
     public function recordPayment($amount, $paymentMethod, $processedBy, $referenceNumber = null, $notes = null)
     {
         if ($amount <= 0) {
@@ -129,7 +130,6 @@ public function updatePaymentStatus()
         }
         
         DB::transaction(function () use ($amount, $paymentMethod, $processedBy, $referenceNumber, $notes) {
-            // Create payment record
             $payment = Payment::create([
                 'sale_id' => $this->id,
                 'customer_id' => $this->customer_id,
@@ -141,11 +141,8 @@ public function updatePaymentStatus()
                 'processed_by' => $processedBy,
             ]);
             
-            // Update sale paid amount
             $this->paid_amount += $amount;
             $this->save();
-            
-            // Update payment status
             $this->updatePaymentStatus();
         });
         

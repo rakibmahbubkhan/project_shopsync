@@ -26,6 +26,12 @@ class SaleReturn extends Model
         'total_amount' => 'decimal:2',
     ];
 
+    /**
+     * IMPORTANT: Prevent recursive relationship loading
+     */
+    protected $with = [];
+    protected $hidden = [];
+
     // Relationships
     public function sale(): BelongsTo
     {
@@ -47,7 +53,11 @@ class SaleReturn extends Model
         return $this->hasMany(Refund::class);
     }
 
-    public function approvedBy(): BelongsTo
+    /**
+     * FIXED: Renamed from approvedBy() to approver()
+     * to avoid naming collision with the 'approved_by' database column
+     */
+    public function approver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
     }
@@ -60,7 +70,7 @@ class SaleReturn extends Model
 
     public function scopeApproved($query)
     {
-        return $query->where('status', 'approved');
+        return $query->whereIn('status', ['approved', 'completed']);
     }
 
     public function scopeCompleted($query)
