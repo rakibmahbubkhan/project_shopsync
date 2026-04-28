@@ -157,6 +157,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('sales', SaleController::class);
     Route::get('/sales/recent-products', [SaleController::class, 'recentProducts']);
 
+
+
     // 4. Purchases & Suppliers
     Route::apiResource('suppliers', SupplierController::class);
     Route::apiResource('purchases', PurchaseController::class); 
@@ -170,7 +172,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('stock-adjustments', [StockAdjustmentController::class, 'store']);
 
     // 6. Returns & Refunds
-    Route::post('returns', [ReturnController::class, 'store']);
+    Route::prefix('returns')->group(function () {
+        Route::get('/', [ReturnController::class, 'index']);
+        Route::get('/search-sales', [ReturnController::class, 'searchSales']);
+        Route::post('/', [ReturnController::class, 'store']);
+        Route::get('/{saleReturn}', [ReturnController::class, 'show']);
+        Route::post('/{saleReturn}/approve', [ReturnController::class, 'approve']);
+        Route::post('/{saleReturn}/reject', [ReturnController::class, 'reject']);
+    });
 
     // 7. Accounting & Financial Reports
     Route::get('reports/trial-balance', [FinancialReportController::class, 'trialBalance']);

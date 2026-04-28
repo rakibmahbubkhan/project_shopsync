@@ -60,7 +60,7 @@
         
         <!-- Dashboard -->
         <router-link 
-          :to="'/dashboard'" 
+          :to="'/'" 
           class="nav-item group" 
           active-class="active" 
           :class="{ 'justify-center': isCollapsed }"
@@ -96,7 +96,7 @@
           >
             <span class="icon text-lg">🔧</span>
             <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm text-left">Inventory</span>
-            <span v-if="!isCollapsed && !isInventoryOpen" class="badge-modern from-orange-500 to-red-500">3</span>
+            <span v-if="!isCollapsed && !isInventoryOpen" class="badge-modern from-orange-500 to-red-500">6</span>
             <svg 
               v-if="!isCollapsed" 
               class="w-4 h-4 transition-transform duration-300" 
@@ -178,17 +178,96 @@
             <p class="text-[10px] font-semibold text-white/40 uppercase tracking-wider">Operations</p>
           </div>
           
+          <!-- Sales with Collapsible Submenu -->
+          <div class="space-y-1">
+            <button 
+              @click="toggleSalesMenu"
+              class="nav-item group w-full flex items-center" 
+              :class="{ 
+                'justify-center': isCollapsed, 
+                'bg-white/10 text-white': isSalesOpen 
+              }"
+            >
+              <span class="icon text-lg">💰</span>
+              <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm text-left">Sales</span>
+              <svg 
+                v-if="!isCollapsed" 
+                class="w-4 h-4 transition-transform duration-300" 
+                :class="{ 'rotate-180': isSalesOpen }" 
+                fill="none" stroke="currentColor" viewBox="0 0 24 24"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+              <span v-if="isCollapsed" class="tooltip">Sales</span>
+            </button>
+
+            <!-- Sales Submenu Items -->
+            <div v-if="!isCollapsed && isSalesOpen" class="pl-10 space-y-1 mt-1">
+              <router-link to="/sales" class="sub-nav-item" active-class="active-sub">
+                Sales History
+              </router-link>
+              <router-link to="/sales/returns" class="sub-nav-item" active-class="active-sub">
+                <div class="flex items-center justify-between">
+                  <span>Sales Returns</span>
+                </div>
+              </router-link>
+            </div>
+          </div>
+
+          <!-- Purchases -->
           <router-link 
-            v-for="item in operationItems" 
-            :key="item.to"
-            :to="item.to" 
+            :to="'/purchases'" 
             class="nav-item group" 
             active-class="active" 
             :class="{ 'justify-center': isCollapsed }"
           >
-            <span class="icon text-lg">{{ item.icon }}</span>
-            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm font-medium">{{ item.label }}</span>
-            <span v-if="isCollapsed" class="tooltip">{{ item.label }}</span>
+            <span class="icon text-lg">📋</span>
+            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm font-medium">Purchase List</span>
+            <span v-if="isCollapsed" class="tooltip">Purchase List</span>
+          </router-link>
+
+          <router-link 
+            :to="'/purchases/create'" 
+            class="nav-item group" 
+            active-class="active" 
+            :class="{ 'justify-center': isCollapsed }"
+          >
+            <span class="icon text-lg">📦</span>
+            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm font-medium">New Purchase</span>
+            <span v-if="isCollapsed" class="tooltip">New Purchase</span>
+          </router-link>
+
+          <router-link 
+            :to="'/suppliers'" 
+            class="nav-item group" 
+            active-class="active" 
+            :class="{ 'justify-center': isCollapsed }"
+          >
+            <span class="icon text-lg">🏭</span>
+            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm font-medium">Suppliers</span>
+            <span v-if="isCollapsed" class="tooltip">Suppliers</span>
+          </router-link>
+
+          <router-link 
+            :to="'/warehouses'" 
+            class="nav-item group" 
+            active-class="active" 
+            :class="{ 'justify-center': isCollapsed }"
+          >
+            <span class="icon text-lg">🏪</span>
+            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm font-medium">Warehouses</span>
+            <span v-if="isCollapsed" class="tooltip">Warehouses</span>
+          </router-link>
+
+          <router-link 
+            :to="'/inventory/transfer'" 
+            class="nav-item group" 
+            active-class="active" 
+            :class="{ 'justify-center': isCollapsed }"
+          >
+            <span class="icon text-lg">🚚</span>
+            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm font-medium">Stock Transfer</span>
+            <span v-if="isCollapsed" class="tooltip">Stock Transfer</span>
           </router-link>
         </div>
 
@@ -297,6 +376,9 @@ const isInventoryOpen = ref(false);
 // Customers submenu state
 const isCustomersOpen = ref(false);
 
+// Sales submenu state
+const isSalesOpen = ref(false);
+
 // Pending customers count
 const pendingCount = ref(0);
 
@@ -325,6 +407,12 @@ onMounted(() => {
   const savedCustomersState = localStorage.getItem('customersMenuOpen');
   if (savedCustomersState !== null) {
     isCustomersOpen.value = JSON.parse(savedCustomersState);
+  }
+
+  // Load sales menu state
+  const savedSalesState = localStorage.getItem('salesMenuOpen');
+  if (savedSalesState !== null) {
+    isSalesOpen.value = JSON.parse(savedSalesState);
   }
   
   // Fetch pending count
@@ -363,6 +451,14 @@ const toggleCustomersMenu = () => {
   }
 };
 
+// Toggle sales submenu
+const toggleSalesMenu = () => {
+  if (!isCollapsed.value) {
+    isSalesOpen.value = !isSalesOpen.value;
+    localStorage.setItem('salesMenuOpen', JSON.stringify(isSalesOpen.value));
+  }
+};
+
 const isAdmin = computed(() => {
   return auth.user?.role_id === 1 || auth.user?.role === 'admin';
 });
@@ -376,15 +472,6 @@ const userRole = computed(() => {
 const userInitial = computed(() => userName.value.charAt(0).toUpperCase());
 
 // Menu items configuration
-const operationItems = [
-  { to: '/sales', icon: '💰', label: 'Sales History' },
-  { to: '/purchases', icon: '📋', label: 'Purchase List' },
-  { to: '/purchases/create', icon: '📦', label: 'New Purchase' },
-  { to: '/suppliers', icon: '🏭', label: 'Suppliers' },
-  { to: '/warehouses', icon: '🏪', label: 'Warehouses' },
-  { to: '/inventory/transfer', icon: '🚚', label: 'Stock Transfer' }
-];
-
 const adminItems = [
   { to: '/users', icon: '👥', label: 'Staff Management' },
   { to: '/financial', icon: '📈', label: 'Financial Reports' },

@@ -25,16 +25,18 @@ class StockService
         float $unitCost,
         string $referenceType,
         int $referenceId,
-        ?int $userId = null
+        ?int $userId = null,
+        ?string $notes = null  // Add this parameter
     ): void {
         DB::transaction(function () use (
-            $productId,
-            $warehouseId,
-            $quantity,
-            $unitCost,
-            $referenceType,
-            $referenceId,
-            $userId
+        $productId,
+        $warehouseId,
+        $quantity,
+        $unitCost,
+        $referenceType,
+        $referenceId,
+        $userId,
+        $notes
         ) {
             // Get or create product stock record
             $productStock = ProductStock::firstOrNew([

@@ -3,42 +3,88 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SaleReturn extends Model
 {
-    //
-
     protected $fillable = [
         'sale_id',
-        'product_id',
-        'quantity',
-        'refund_amount',
-        'cost_price',
-        'profit_reversed',
-        'processed_by'
+        'user_id',
+        'return_date',
+        'reason',
+        'total_amount',
+        'status',
+        'notes',
+        'approved_by',
+        'approved_at'
     ];
 
-    public function sale()
+    protected $casts = [
+        'return_date' => 'datetime',
+        'approved_at' => 'datetime',
+        'total_amount' => 'decimal:2',
+    ];
+
+    // Relationships
+    public function sale(): BelongsTo
     {
         return $this->belongsTo(Sale::class);
     }
 
-    public function product()
+    public function user(): BelongsTo
     {
-        return $this->belongsTo(Product::class);
+        return $this->belongsTo(User::class, 'user_id');
     }
 
-    public function processedBy()
+    public function items(): HasMany
     {
-        return $this->belongsTo(User::class, 'processed_by');
+        return $this->hasMany(SaleReturnItem::class);
     }
 
-    public function refund()
+    public function refund(): HasMany
     {
-        return $this->hasOne(Refund::class);
+        return $this->hasMany(Refund::class);
     }
 
+    public function approvedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    // Scopes
+    public function scopePending($query)
+    {
+        return $query->where('status', 'pending');
+    }
+
+    public function scopeApproved($query)
+    {
+        return $query->where('status', 'approved');
+    }
+
+    public function scopeCompleted($query)
+    {
+        return $query->where('status', 'completed');
+    }
+
+    // Helper Methods
+    public function approve(int $userId): void
+    {
+        $this->update([
+            'status' => 'approved',
+            'approved_by' => $userId,
+            'approved_at' => now()
+        ]);
+    }
+
+    public function complete(): void
+    {
+        $this->update(['status' => 'completed']);
+    }
+
+    public function reject(): void
+    {
+        $this->update(['status' => 'rejected']);
+    }
 }
-
-
-
