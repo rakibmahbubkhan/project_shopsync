@@ -22,10 +22,12 @@ class CreateStockTransfersTable extends Migration
             $table->foreignId('user_id')->constrained('users');
             $table->timestamps();
             
-            // Indexes
+            // Indexes for better performance
             $table->index('reference_no');
             $table->index('transfer_date');
             $table->index('status');
+            $table->index('from_warehouse_id');
+            $table->index('to_warehouse_id');
         });
     }
 

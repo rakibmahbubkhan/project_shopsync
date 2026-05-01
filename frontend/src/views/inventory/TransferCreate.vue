@@ -10,13 +10,6 @@
         </div>
         <div class="flex gap-3">
           <button 
-            @click="saveAsDraft" 
-            :disabled="loading"
-            class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
-          >
-            Save as Draft
-          </button>
-          <button 
             @click="submitTransfer" 
             :disabled="loading || !isValid"
             class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
@@ -47,10 +40,16 @@
           class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         >
           <option value="">Select source warehouse</option>
-          <option v-for="w in warehouses" :key="w.id" :value="w.id">
-            {{ w.name }} ({{ w.location || 'No location' }})
+          <option v-for="w in warehouseList" :key="w.id" :value="w.id">
+            {{ w.name }} {{ w.code ? '(' + w.code + ')' : '' }}
           </option>
         </select>
+        <div v-if="warehouseList.length === 0 && !loadingWarehouses" class="text-red-500 text-sm mt-2">
+          No warehouses found. Please create a warehouse first.
+        </div>
+        <div v-if="loadingWarehouses" class="text-gray-500 text-sm mt-2">
+          Loading warehouses...
+        </div>
         <p v-if="form.from_warehouse_id" class="text-xs text-gray-500 mt-2">
           Available stock will be shown for selected warehouse
         </p>
@@ -67,12 +66,12 @@
         >
           <option value="">Select destination warehouse</option>
           <option 
-            v-for="w in warehouses" 
+            v-for="w in warehouseList" 
             :key="w.id" 
             :value="w.id"
             :disabled="w.id === form.from_warehouse_id"
           >
-            {{ w.name }} ({{ w.location || 'No location' }})
+            {{ w.name }} {{ w.code ? '(' + w.code + ')' : '' }}
             <span v-if="w.id === form.from_warehouse_id" class="text-gray-400"> - Same as source</span>
           </option>
         </select>
@@ -108,7 +107,7 @@
             <tr v-for="(item, index) in form.items" :key="index" class="hover:bg-gray-50">
               <td class="p-4">
                 <div class="font-medium text-gray-800">{{ item.name }}</div>
-                <div class="text-xs text-gray-500">{{ item.category?.name || 'Uncategorized' }}</div>
+                <div class="text-xs text-gray-500">{{ item.category || 'Uncategorized' }}</div>
               </td>
               <td class="p-4 text-sm text-gray-600">{{ item.sku || '-' }}</td>
               <td class="p-4">
@@ -203,7 +202,17 @@
 
         <!-- Products List -->
         <div class="flex-1 overflow-y-auto p-4">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div v-if="loadingProducts" class="text-center py-12">
+            <svg class="animate-spin h-8 w-8 text-blue-600 mx-auto" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+            </svg>
+            <p class="text-gray-500 mt-2">Loading products...</p>
+          </div>
+          <div v-else-if="filteredProducts.length === 0" class="text-center py-12">
+            <p class="text-gray-500">No products found with stock in this warehouse</p>
+          </div>
+          <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div 
               v-for="product in filteredProducts" 
               :key="product.id"
@@ -235,9 +244,6 @@
               </div>
             </div>
           </div>
-          <div v-if="filteredProducts.length === 0" class="text-center py-12">
-            <p class="text-gray-500">No products found with stock in this warehouse</p>
-          </div>
         </div>
 
         <div class="p-4 border-t bg-gray-50 flex justify-end">
@@ -247,24 +253,47 @@
         </div>
       </div>
     </div>
+
+    <!-- Toast Notifications -->
+    <div v-if="toastMessage" class="fixed bottom-4 right-4 z-50">
+      <div :class="toastType === 'error' ? 'bg-red-500' : 'bg-green-500'" class="text-white px-6 py-3 rounded-lg shadow-lg">
+        {{ toastMessage }}
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '@/api/axios';
-import { useToast } from '@/composables/useToast';
 
 const router = useRouter();
-const { showToast } = useToast();
 
 // State
 const warehouses = ref([]);
 const products = ref([]);
 const loading = ref(false);
+const loadingWarehouses = ref(false);
+const loadingProducts = ref(false);
 const showProductModal = ref(false);
 const productSearch = ref('');
+const toastMessage = ref('');
+const toastType = ref('success');
+
+// Computed property to extract warehouse array from pagination response
+const warehouseList = computed(() => {
+  // Check if warehouses.value is an array
+  if (Array.isArray(warehouses.value)) {
+    return warehouses.value;
+  }
+  // Check if it's a pagination object with data property
+  if (warehouses.value && warehouses.value.data && Array.isArray(warehouses.value.data)) {
+    return warehouses.value.data;
+  }
+  // Return empty array if neither
+  return [];
+});
 
 // Form data
 const form = reactive({
@@ -284,7 +313,7 @@ const isValid = computed(() => {
 });
 
 const selectedWarehouseName = computed(() => {
-  const warehouse = warehouses.value.find(w => w.id === form.from_warehouse_id);
+  const warehouse = warehouseList.value.find(w => w.id === form.from_warehouse_id);
   return warehouse?.name || 'Selected Warehouse';
 });
 
@@ -298,38 +327,82 @@ const filteredProducts = computed(() => {
 });
 
 // Methods
+const showToast = (message, type = 'success') => {
+  toastMessage.value = message;
+  toastType.value = type;
+  setTimeout(() => {
+    toastMessage.value = '';
+  }, 3000);
+};
+
 const fetchWarehouses = async () => {
+  loadingWarehouses.value = true;
   try {
     const response = await api.get('/warehouses');
-    warehouses.value = response.data;
+    
+    console.log('Warehouses API response:', response.data);
+    
+    // Handle different response formats
+    if (response.data && response.data.success && response.data.data) {
+      warehouses.value = response.data.data;
+    } else if (response.data && response.data.data) {
+      warehouses.value = response.data.data;
+    } else if (Array.isArray(response.data)) {
+      warehouses.value = response.data;
+    } else {
+      warehouses.value = response.data;
+    }
+    
+    console.log('Processed warehouses:', warehouseList.value);
+    
+    if (warehouseList.value.length === 0) {
+      showToast('No warehouses found. Please create a warehouse first.', 'error');
+    }
   } catch (error) {
     console.error('Failed to load warehouses:', error);
-    showToast('Failed to load warehouses', 'error');
+    showToast('Failed to load warehouses. Please check your connection.', 'error');
+    warehouses.value = [];
+  } finally {
+    loadingWarehouses.value = false;
   }
 };
 
 const fetchAvailableProducts = async (warehouseId) => {
   if (!warehouseId) return;
   
+  loadingProducts.value = true;
   try {
     const response = await api.get(`/stock-transfers/available-products`, {
       params: { warehouse_id: warehouseId }
     });
-    products.value = response.data.data;
+    
+    if (response.data && response.data.success) {
+      products.value = response.data.data;
+    } else if (response.data && response.data.data) {
+      products.value = response.data.data;
+    } else {
+      products.value = response.data;
+    }
+    
+    console.log('Products loaded:', products.value);
   } catch (error) {
     console.error('Failed to load products:', error);
     showToast('Failed to load products', 'error');
+    products.value = [];
+  } finally {
+    loadingProducts.value = false;
   }
 };
 
 const onWarehouseChange = () => {
   form.items = []; // Clear items when warehouse changes
+  form.to_warehouse_id = ''; // Reset destination when source changes
   fetchAvailableProducts(form.from_warehouse_id);
 };
 
 const openProductModal = () => {
   if (!form.from_warehouse_id) {
-    showToast('Please select a source warehouse first', 'warning');
+    showToast('Please select a source warehouse first', 'error');
     return;
   }
   showProductModal.value = true;
@@ -367,7 +440,7 @@ const addProductToTransfer = (product) => {
 
 const validateQuantity = (item, index) => {
   if (item.quantity > item.current_stock) {
-    showToast(`Quantity exceeds available stock (${item.current_stock} ${item.unit})`, 'warning');
+    showToast(`Quantity exceeds available stock (${item.current_stock} ${item.unit})`, 'error');
   }
   if (item.quantity <= 0) {
     item.quantity = 0.01;
@@ -376,39 +449,38 @@ const validateQuantity = (item, index) => {
 
 const removeItem = (index) => {
   form.items.splice(index, 1);
-  showToast('Item removed from transfer', 'info');
-};
-
-const saveAsDraft = async () => {
-  // Implement draft saving logic
-  showToast('Draft feature coming soon', 'info');
+  showToast('Item removed from transfer', 'success');
 };
 
 const submitTransfer = async () => {
   if (!isValid.value) {
-    showToast('Please fill all required fields and ensure quantities are valid', 'warning');
+    showToast('Please fill all required fields and ensure quantities are valid', 'error');
     return;
   }
   
   loading.value = true;
   
   const submitData = {
-    from_warehouse_id: form.from_warehouse_id,
-    to_warehouse_id: form.to_warehouse_id,
+    from_warehouse_id: parseInt(form.from_warehouse_id),
+    to_warehouse_id: parseInt(form.to_warehouse_id),
     transfer_date: form.transfer_date,
     items: form.items.map(item => ({
-      product_id: item.product_id,
-      quantity: item.quantity
+      product_id: parseInt(item.product_id),
+      quantity: parseFloat(item.quantity)
     })),
     notes: form.notes
   };
+  
+  console.log('Submitting transfer:', submitData);
   
   try {
     const response = await api.post('/stock-transfers', submitData);
     
     if (response.data.success) {
       showToast('Stock transfer completed successfully!', 'success');
-      router.push('/inventory/transfer');
+      setTimeout(() => {
+        router.push('/inventory/transfer');
+      }, 1500);
     }
   } catch (error) {
     const message = error.response?.data?.message || 'Transfer failed. Please try again.';
@@ -427,4 +499,4 @@ const formatNumber = (num) => {
 onMounted(() => {
   fetchWarehouses();
 });
-</script> 
+</script>

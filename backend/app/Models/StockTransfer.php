@@ -5,20 +5,19 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use App\Traits\Auditable;
 
 class StockTransfer extends Model
 {
-    use Auditable;
+    protected $table = 'stock_transfers';
 
     protected $fillable = [
-        'from_warehouse_id', 
-        'to_warehouse_id', 
-        'reference_no', 
-        'transfer_date', 
+        'from_warehouse_id',
+        'to_warehouse_id',
+        'reference_no',
+        'transfer_date',
         'total_items',
         'total_cost',
-        'status', 
+        'status',
         'notes',
         'user_id'
     ];
@@ -50,44 +49,9 @@ class StockTransfer extends Model
         return $this->belongsTo(User::class);
     }
 
-    // Scopes
-    public function scopeCompleted($query)
-    {
-        return $query->where('status', 'completed');
-    }
-
-    public function scopePending($query)
-    {
-        return $query->where('status', 'pending');
-    }
-
-    // Helper Methods
-    public function isCompleted(): bool
-    {
-        return $this->status === 'completed';
-    }
-
+    // Helper method to check if transfer can be cancelled
     public function canBeCancelled(): bool
     {
         return in_array($this->status, ['pending', 'draft']);
-    }
-
-    public function updateTotals(): void
-    {
-        $this->total_items = $this->items()->count();
-        $this->total_cost = $this->items()->sum('total_cost');
-        $this->saveQuietly();
-    }
-
-    // Boot method for auto-generating reference number
-    protected static function boot()
-    {
-        parent::boot();
-
-        static::creating(function ($transfer) {
-            if (empty($transfer->reference_no)) {
-                $transfer->reference_no = 'TRF-' . date('Ymd') . '-' . str_pad(static::max('id') + 1, 5, '0', STR_PAD_LEFT);
-            }
-        });
     }
 }

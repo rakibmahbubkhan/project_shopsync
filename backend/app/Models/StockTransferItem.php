@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class StockTransferItem extends Model
 {
+    protected $table = 'stock_transfer_items';
+
     protected $fillable = [
         'stock_transfer_id',
         'product_id',
@@ -30,13 +32,5 @@ class StockTransferItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
-    }
-
-    // Auto-calculate total cost
-    protected static function booted()
-    {
-        static::saving(function ($item) {
-            $item->total_cost = $item->quantity * $item->unit_cost;
-        });
     }
 }
