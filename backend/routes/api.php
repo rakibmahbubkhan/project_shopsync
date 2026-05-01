@@ -180,7 +180,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('purchases/{purchase}/items', [PurchaseController::class, 'getItems']);
 
     // 5. Stock Operations
-    Route::apiResource('stock-transfers', StockTransferController::class);
+    // Route::apiResource('stock-transfers', StockTransferController::class);
+     Route::get('/stock-transfers', [StockTransferController::class, 'index']);
+    Route::get('/stock-transfers/available-products', [StockTransferController::class, 'getAvailableProducts']);
+    Route::post('/stock-transfers', [StockTransferController::class, 'store']);
+    Route::get('/stock-transfers/{stockTransfer}', [StockTransferController::class, 'show']);
+    Route::post('/stock-transfers/{stockTransfer}/cancel', [StockTransferController::class, 'cancel']);
+    Route::delete('/stock-transfers/{stockTransfer}', [StockTransferController::class, 'destroy']);
+    Route::get('/stock-transfers/report', [StockTransferController::class, 'report']);
     Route::post('stock-adjustments', [StockAdjustmentController::class, 'store']);
 
     // 6. Returns & Refunds

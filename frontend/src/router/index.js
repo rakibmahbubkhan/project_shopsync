@@ -41,7 +41,8 @@ const routes = [
       { path: 'warehouses', name: 'warehouses', component: () => import('@/views/warehouses/WarehouseList.vue')},
 
       // Stock Operations
-      { path: 'inventory/transfer', name: 'stock-transfer', component: () => import('@/views/inventory/TransferCreate.vue') },
+      { path: 'inventory/transfer/create', name: 'create-stock-transfer', component: () => import('@/views/inventory/TransferCreate.vue') },
+      { path: 'inventory/transfer', name: 'stock-transfer', component: () => import('@/views/inventory/TransferList.vue') },
 
       // Financial Reports
       { path: 'financial', name: 'financial', component: () => import('@/views/financial/TrialBalance.vue') },
