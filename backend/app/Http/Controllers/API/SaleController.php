@@ -81,7 +81,12 @@ public function store(StoreSaleRequest $request)
             
             // Process Each Item
             foreach ($request->items as $item) {
-                $costPrice = $item['cost_price'] ?? 100; // Temporary default
+                // Get actual cost price from stock service
+                $costPrice = $this->stockService->getAverageCost(
+                    $item['product_id'],
+                    $sale->warehouse_id
+                );
+                
                 $quantity = $item['quantity'];
                 $sellingPrice = $item['selling_price'];
                 
@@ -100,6 +105,18 @@ public function store(StoreSaleRequest $request)
                     'subtotal'      => $subtotal,
                     'gross_profit'  => $subtotal - $cogs,
                 ]);
+                
+                // Decrease stock using StockService
+                $this->stockService->decreaseStock(
+                    $item['product_id'],
+                    $sale->warehouse_id,
+                    $quantity,
+                    $costPrice,
+                    'sale',
+                    $sale->id,
+                    Auth::id(),
+                    "Sale #{$sale->id} - Customer: {$request->customer_id}"
+                );
             }
             
             // Calculate Final Total
@@ -112,7 +129,7 @@ public function store(StoreSaleRequest $request)
                 'gross_profit' => $subtotalTotal - $totalCogs,
             ]);
             
-            // Return simple response without relationships first
+            // Return response
             return response()->json([
                 'message' => 'Sale created successfully',
                 'id' => $sale->id,

@@ -4,42 +4,99 @@ namespace App\Http\Controllers\API;
 
 use App\Models\Product;
 use Illuminate\Http\Request;
-use App\Http\Controllers\Controller;
+use App\Services\StockService;
+use App\Models\ProductStock;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Cache;
+use App\Http\Controllers\Controller;
+
 
 class ProductController extends Controller
 {
     /**
      * List products with search, sorting, and pagination.
      */
+    protected StockService $stockService;
+
+    public function __construct(StockService $stockService)
+    {
+        $this->stockService = $stockService;
+    }
+
+
     public function index(Request $request)
     {
         $cacheKey = 'products_' . md5(json_encode($request->all()));
         
         $products = Cache::remember($cacheKey, now()->addMinutes(5), function() use ($request) {
-            $query = Product::with(['category:id,name', 'brand:id,name', 'unit:id,name']);
+            // Build the query with stock calculation
+            $query = Product::with(['category:id,name', 'brand:id,name', 'unit:id,name'])
+                ->leftJoin('product_stocks', 'products.id', '=', 'product_stocks.product_id')
+                ->select(
+                    'products.*',
+                    DB::raw('COALESCE(SUM(product_stocks.quantity), 0) as real_stock_quantity')
+                )
+                ->groupBy('products.id');
             
+            // Apply search filter
             if ($request->search) {
                 $query->where(function($q) use ($request) {
-                    $q->where('name', 'like', "%{$request->search}%")
-                      ->orWhere('sku', 'like', "%{$request->search}%");
+                    $q->where('products.name', 'like', "%{$request->search}%")
+                      ->orWhere('products.sku', 'like', "%{$request->search}%");
                 });
             }
             
+            // Apply category filter
             if ($request->category_id) {
-                $query->where('category_id', $request->category_id);
+                $query->where('products.category_id', $request->category_id);
             }
             
-            $sortField = in_array($request->sort_by, ['name', 'sku', 'price', 'stock_quantity']) ? $request->sort_by : 'created_at';
+            // Apply warehouse filter (if specific warehouse is selected)
+            if ($request->warehouse_id) {
+                $query->where('product_stocks.warehouse_id', $request->warehouse_id);
+            }
+            
+            // Sorting - allow sorting by real stock quantity
+            $sortField = $request->sort_by;
             $order = $request->order === 'asc' ? 'asc' : 'desc';
             
-            return $query->orderBy($sortField, $order)->paginate($request->per_page ?? 10);
+            switch ($sortField) {
+                case 'name':
+                    $query->orderBy('products.name', $order);
+                    break;
+                case 'sku':
+                    $query->orderBy('products.sku', $order);
+                    break;
+                case 'price':
+                case 'selling_price':
+                    $query->orderBy('products.selling_price', $order);
+                    break;
+                case 'stock_quantity':
+                case 'real_stock':
+                    $query->orderBy('real_stock_quantity', $order);
+                    break;
+                default:
+                    $query->orderBy('products.created_at', $order);
+                    break;
+            }
+            
+            $perPage = $request->per_page ?? 10;
+            $results = $query->paginate($perPage);
+            
+            // Transform the results to include real_stock as stock_quantity for frontend compatibility
+            $results->getCollection()->transform(function ($product) {
+                $product->stock_quantity = $product->real_stock_quantity;
+                return $product;
+            });
+            
+            return $results;
         });
         
         return response()->json($products);
     }
+
 
     /**
      * Get form data (categories, brands, units, warehouses)
@@ -101,15 +158,27 @@ class ProductController extends Controller
 
             $initialStock = $validated['stock_quantity'] ?? 0;
             
-            \App\Models\ProductStock::create([
-                'product_id' => $product->id,
-                'warehouse_id' => $validated['warehouse_id'],
-                'quantity' => $initialStock,
-                'avg_cost' => $validated['cost_price'],
-            ]);
-
             if ($initialStock > 0) {
-                $product->update(['stock_quantity' => $initialStock]);
+                // Use StockService to add initial stock
+                $this->stockService->increaseStock(
+                    $product->id,
+                    $validated['warehouse_id'],
+                    $initialStock,
+                    $validated['cost_price'],
+                    'product_creation',
+                    $product->id,
+                    Auth::id(),
+                    "Initial stock on product creation"
+                );
+            } else {
+                // Create stock record with zero quantity
+                ProductStock::create([
+                    'product_id' => $product->id,
+                    'warehouse_id' => $validated['warehouse_id'],
+                    'quantity' => 0,
+                    'avg_cost' => $validated['cost_price'],
+                    'last_updated_by' => Auth::id(),
+                ]);
             }
 
             $this->clearProductCache();
@@ -138,6 +207,7 @@ class ProductController extends Controller
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
         ]);
         
+        // Handle image upload
         if ($request->hasFile('image')) {
             if ($product->image) {
                 Storage::disk('public')->delete($product->image);
@@ -163,6 +233,11 @@ class ProductController extends Controller
                     return response()->json([
                         'message' => 'Cannot delete product: It has transaction history.'
                     ], 422);
+                }
+
+                // Delete image if exists
+                if ($product->image) {
+                    Storage::disk('public')->delete($product->image);
                 }
 
                 $product->stocks()->delete();
@@ -199,21 +274,85 @@ class ProductController extends Controller
     /**
      * Clear all product-related caches
      */
-    /**
- * Clear all product-related caches
- */
     private function clearProductCache()
     {
-        // Clear only product-related cache keys instead of full flush
-        Cache::forget('products_*');
-        Cache::forget('low_stock_products');
+        // For file/database cache drivers that don't support wildcards,
+        // we need to clear specific known keys
         Cache::forget('product_form_data');
+        Cache::forget('low_stock_products');
         
-        // If using cache tags (Redis/Memcached)
-        if (method_exists(Cache::store(), 'tags')) {
-            Cache::tags(['products'])->flush();
-        }
+        // Clear product list caches (they have dynamic keys)
+        // Since we can't use wildcards with file cache, we'll use a prefix approach
+        $this->clearProductListCaches();
     }
-
     
+    /**
+     * Clear product list caches by scanning cache store
+     */
+    private function clearProductListCaches()
+    {
+        // For file cache, we need to manually clear cache files with products_ prefix
+        $cachePath = storage_path('framework/cache/data');
+        
+        if (file_exists($cachePath)) {
+            $files = glob($cachePath . '/products_*');
+            foreach ($files as $file) {
+                if (is_file($file)) {
+                    @unlink($file);
+                }
+            }
+        }
+        
+        // For database cache, we would need to delete records with key like 'products_%'
+        // But for simplicity, we can just forget a known set or use a version counter
+        Cache::forget('products_version');
+        
+        // Increment version to invalidate cached product lists
+        $version = Cache::get('products_version', 0) + 1;
+        Cache::forever('products_version', $version);
+    }
+    
+    /**
+     * Get a product by ID with caching
+     */
+    public function show($id)
+    {
+        $cacheKey = 'product_' . $id;
+        
+        $product = Cache::remember($cacheKey, now()->addHours(1), function() use ($id) {
+            return Product::with(['category', 'brand', 'unit', 'stocks.warehouse'])
+                ->findOrFail($id);
+        });
+        
+        return response()->json($product);
+    }
+    
+    /**
+     * Bulk update stock quantities
+     */
+    public function bulkUpdateStock(Request $request)
+    {
+        $validated = $request->validate([
+            'updates' => 'required|array',
+            'updates.*.product_id' => 'required|exists:products,id',
+            'updates.*.warehouse_id' => 'required|exists:warehouses,id',
+            'updates.*.quantity' => 'required|numeric|min:0',
+        ]);
+        
+        DB::transaction(function () use ($validated) {
+            foreach ($validated['updates'] as $update) {
+                \App\Models\ProductStock::updateOrCreate(
+                    [
+                        'product_id' => $update['product_id'],
+                        'warehouse_id' => $update['warehouse_id'],
+                    ],
+                    ['quantity' => $update['quantity']]
+                );
+            }
+        });
+        
+        $this->clearProductCache();
+        
+        return response()->json(['message' => 'Stock updated successfully']);
+    }
 }

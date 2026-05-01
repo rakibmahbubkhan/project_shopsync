@@ -1,7 +1,6 @@
 <template>
   <div class="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50/30">
     <div class="container mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8">
-      
       <!-- Header -->
       <div class="mb-6 md:mb-8">
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6">
@@ -27,7 +26,7 @@
                 Cancel
               </router-link>
               <button 
-                v-if="isEditMode && purchaseData.status !== 'received'"
+                v-if="isEditMode && purchaseData && purchaseData.status !== 'received'"
                 @click="receivePurchase" 
                 class="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-green-200 flex items-center gap-2"
               >
@@ -75,7 +74,7 @@
               
               <!-- Search Results Dropdown -->
               <div 
-                v-if="searchResults.length > 0" 
+                v-if="searchResults && searchResults.length > 0" 
                 class="absolute z-10 w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-xl max-h-80 overflow-y-auto divide-y divide-gray-100"
               >
                 <div 
@@ -87,7 +86,7 @@
                   <div class="flex-1">
                     <div class="font-semibold text-gray-800 group-hover:text-purple-600">{{ product.name }}</div>
                     <div class="text-sm text-gray-500 mt-0.5">
-                      SKU: {{ product.sku || product.code }}
+                      SKU: {{ product.sku || product.code || '-' }}
                     </div>
                     <div class="text-xs text-gray-400 mt-1">
                       Cost: ৳{{ formatNumber(product.purchase_price || product.cost_price) }}
@@ -121,86 +120,88 @@
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
-                  <tr v-for="(item, index) in cart" :key="index" class="hover:bg-gray-50 transition-colors">
-                    <td class="px-4 py-3">
-                      <div class="font-medium text-gray-800">{{ item.name }}</div>
-                    </td>
-                    <td class="px-4 py-3 text-gray-500 text-xs">{{ item.sku || item.code }}</td>
-                    <td class="px-4 py-3">
-                      <input 
-                        type="number" 
-                        v-model="item.quantity" 
-                        @input="calculateItemTotal(item)"
-                        min="0.01"
-                        step="0.01"
-                        :readonly="isEditMode"
-                        class="w-20 px-2 py-1.5 border-2 border-gray-200 rounded-lg focus:border-purple-300 focus:ring-2 focus:ring-purple-100 outline-none transition-all"
-                        :class="{'bg-gray-100': isEditMode}"
-                      >
-                    </td>
-                    <td class="px-4 py-3">
-                      <div class="relative">
-                        <span class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">৳</span>
+                  <template v-if="cart && cart.length > 0">
+                    <tr v-for="(item, index) in cart" :key="item.product_id || index" class="hover:bg-gray-50 transition-colors">
+                      <td class="px-4 py-3">
+                        <div class="font-medium text-gray-800">{{ item.name || 'Unknown Product' }}</div>
+                      </td>
+                      <td class="px-4 py-3 text-gray-500 text-xs">{{ item.sku || '-' }}</td>
+                      <td class="px-4 py-3">
                         <input 
                           type="number" 
-                          v-model="item.purchase_price" 
-                          @input="calculateItemTotal(item)"
-                          min="0"
+                          :value="item.quantity"
+                          @input="updateItemQuantity(index, $event.target.value)"
+                          min="0.01"
                           step="0.01"
                           :readonly="isEditMode"
-                          class="w-24 pl-6 pr-2 py-1.5 border-2 border-gray-200 rounded-lg focus:border-purple-300 focus:ring-2 focus:ring-purple-100 outline-none transition-all"
-                          :class="{'bg-gray-100': isEditMode}"
-                        >
-                      </div>
-                    </td>
-                    <td class="px-4 py-3">
-                      <div class="relative">
-                        <input 
-                          type="number" 
-                          v-model="item.discount" 
-                          @input="calculateItemTotal(item)"
-                          min="0"
-                          max="100"
-                          step="0.1"
-                          :readonly="isEditMode"
                           class="w-20 px-2 py-1.5 border-2 border-gray-200 rounded-lg focus:border-purple-300 focus:ring-2 focus:ring-purple-100 outline-none transition-all"
                           :class="{'bg-gray-100': isEditMode}"
-                          placeholder="0"
                         >
-                        <span class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">%</span>
-                      </div>
-                    </td>
-                    <td class="px-4 py-3">
-                      <div class="relative">
-                        <input 
-                          type="number" 
-                          v-model="item.tax" 
-                          @input="calculateItemTotal(item)"
-                          min="0"
-                          max="100"
-                          step="0.1"
-                          :readonly="isEditMode"
-                          class="w-20 px-2 py-1.5 border-2 border-gray-200 rounded-lg focus:border-purple-300 focus:ring-2 focus:ring-purple-100 outline-none transition-all"
-                          :class="{'bg-gray-100': isEditMode}"
-                          placeholder="0"
-                        >
-                        <span class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">%</span>
-                      </div>
-                    </td>
-                    <td class="px-4 py-3 text-right">
-                      <span class="font-semibold text-purple-600">৳{{ formatNumber(item.total) }}</span>
-                    </td>
-                    <td v-if="!isEditMode" class="px-4 py-3 text-center">
-                      <button @click="removeFromCart(index)" class="text-red-400 hover:text-red-600 transition-colors p-1">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </td>
-                  </tr>
+                      </td>
+                      <td class="px-4 py-3">
+                        <div class="relative">
+                          <span class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">৳</span>
+                          <input 
+                            type="number" 
+                            :value="item.purchase_price"
+                            @input="updateItemPrice(index, $event.target.value)"
+                            min="0"
+                            step="0.01"
+                            :readonly="isEditMode"
+                            class="w-24 pl-6 pr-2 py-1.5 border-2 border-gray-200 rounded-lg focus:border-purple-300 focus:ring-2 focus:ring-purple-100 outline-none transition-all"
+                            :class="{'bg-gray-100': isEditMode}"
+                          >
+                        </div>
+                      </td>
+                      <td class="px-4 py-3">
+                        <div class="relative">
+                          <input 
+                            type="number" 
+                            :value="item.discount"
+                            @input="updateItemDiscount(index, $event.target.value)"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            :readonly="isEditMode"
+                            class="w-20 px-2 py-1.5 border-2 border-gray-200 rounded-lg focus:border-purple-300 focus:ring-2 focus:ring-purple-100 outline-none transition-all"
+                            :class="{'bg-gray-100': isEditMode}"
+                            placeholder="0"
+                          >
+                          <span class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">%</span>
+                        </div>
+                      </td>
+                      <td class="px-4 py-3">
+                        <div class="relative">
+                          <input 
+                            type="number" 
+                            :value="item.tax"
+                            @input="updateItemTax(index, $event.target.value)"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            :readonly="isEditMode"
+                            class="w-20 px-2 py-1.5 border-2 border-gray-200 rounded-lg focus:border-purple-300 focus:ring-2 focus:ring-purple-100 outline-none transition-all"
+                            :class="{'bg-gray-100': isEditMode}"
+                            placeholder="0"
+                          >
+                          <span class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">%</span>
+                        </div>
+                      </td>
+                      <td class="px-4 py-3 text-right">
+                        <span class="font-semibold text-purple-600">৳{{ formatNumber(calculateItemTotalFromValues(item.quantity, item.purchase_price, item.discount, item.tax)) }}</span>
+                      </td>
+                      <td v-if="!isEditMode" class="px-4 py-3 text-center">
+                        <button @click="removeFromCart(index)" class="text-red-400 hover:text-red-600 transition-colors p-1">
+                          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </td>
+                    </tr>
+                  </template>
                   
                   <!-- Empty Cart Message -->
-                  <tr v-if="cart.length === 0">
+                  <tr v-else>
                     <td :colspan="isEditMode ? 7 : 8" class="px-4 py-12 text-center">
                       <div class="flex flex-col items-center justify-center">
                         <svg class="w-16 h-16 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -216,7 +217,7 @@
             </div>
 
             <!-- Cart Summary Cards -->
-            <div v-if="cart.length > 0" class="mt-6 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl border border-purple-100">
+            <div v-if="cart && cart.length > 0" class="mt-6 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl border border-purple-100">
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div>
                   <p class="text-xs font-semibold text-purple-600 uppercase tracking-wider">Total Items</p>
@@ -254,7 +255,7 @@
             
             <div class="p-4 sm:p-6 space-y-4">
               <!-- Reference Number (Edit Mode Only) -->
-              <div v-if="isEditMode">
+              <div v-if="isEditMode && purchaseData && purchaseData.reference_no">
                 <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-2">Reference Number</label>
                 <div class="text-gray-800 bg-gray-50 px-3 py-2.5 rounded-lg border border-gray-200 font-mono">
                   {{ purchaseData.reference_no }}
@@ -294,7 +295,7 @@
               <!-- Purchase Status -->
               <div>
                 <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-2">Status</label>
-                <select v-model="form.status" class="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl focus:border-purple-300 focus:ring-4 focus:ring-purple-100 outline-none transition-all bg-white" :disabled="isEditMode && purchaseData.status === 'received'">
+                <select v-model="form.status" class="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl focus:border-purple-300 focus:ring-4 focus:ring-purple-100 outline-none transition-all bg-white" :disabled="isEditMode && purchaseData && purchaseData.status === 'received'">
                   <option value="ordered">📦 Ordered</option>
                   <option value="received">✅ Received</option>
                   <option value="pending">⏳ Pending</option>
@@ -327,130 +328,119 @@
                 </div>
               </div>
 
-              <!-- ============ INSTALLMENT PAYMENTS SECTION (EDIT MODE ONLY) ============ -->
-            <div v-if="isEditMode" class="border-t border-gray-200 pt-4">
-              <div class="flex items-center justify-between mb-3">
-                <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Installment Payments</label>
-                <span class="text-xs text-gray-400">Total: ৳{{ formatNumber(totalAmount) }}</span>
-              </div>
-              
-              <!-- List of all installment payments -->
-              <div class="space-y-3 max-h-80 overflow-y-auto pr-1">
-                <div v-for="(payment, idx) in payments" :key="payment.id" class="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                  <div class="flex justify-between items-start mb-2">
-                    <div>
-                      <span class="font-semibold text-indigo-600 text-sm">Installment #{{ payment.installment_number }}</span>
-                      <div class="text-xs text-gray-500 mt-1">
-                        {{ formatDate(payment.payment_date) }} • {{ getPaymentMethodLabel(payment.payment_method) }}
-                      </div>
-                      <div v-if="payment.reference_no" class="text-xs text-gray-400 mt-1">
-                        Ref: {{ payment.reference_no }}
+              <!-- Installment Payments Section (Edit Mode Only) -->
+              <div v-if="isEditMode" class="border-t border-gray-200 pt-4">
+                <div class="flex items-center justify-between mb-3">
+                  <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Installment Payments</label>
+                  <span class="text-xs text-gray-400">Total: ৳{{ formatNumber(totalAmount) }}</span>
+                </div>
+                
+                <!-- List of all installment payments -->
+                <div class="space-y-3 max-h-80 overflow-y-auto pr-1">
+                  <template v-if="payments && payments.length > 0">
+                    <div v-for="payment in payments" :key="payment.id" class="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                      <div class="flex justify-between items-start mb-2">
+                        <div>
+                          <span class="font-semibold text-indigo-600 text-sm">Installment #{{ payment.installment_number || 'N/A' }}</span>
+                          <div class="text-xs text-gray-500 mt-1">
+                            {{ formatDate(payment.payment_date) }} • {{ getPaymentMethodLabel(payment.payment_method) }}
+                          </div>
+                          <div v-if="payment.reference_no" class="text-xs text-gray-400 mt-1">
+                            Ref: {{ payment.reference_no }}
+                          </div>
+                        </div>
+                        <span class="text-green-600 font-bold text-lg">৳{{ formatNumber(payment.amount) }}</span>
                       </div>
                     </div>
-                    <span class="text-green-600 font-bold text-lg">৳{{ formatNumber(payment.amount) }}</span>
+                  </template>
+                  <div v-else class="text-center text-gray-400 text-sm py-4">
+                    No payments made yet
                   </div>
                 </div>
-                
-                <div v-if="payments.length === 0" class="text-center text-gray-400 text-sm py-4">
-                  No payments made yet
-                </div>
-              </div>
 
-              <!-- Payment Progress -->
-              <div class="mt-4 mb-4">
-                <div class="flex justify-between text-xs mb-1">
-                  <span class="text-gray-600">Paid: ৳{{ formatNumber(form.paid_amount) }}</span>
-                  <span class="text-gray-600">Due: ৳{{ formatNumber(remainingBalance) }}</span>
+                <!-- Payment Progress -->
+                <div class="mt-4 mb-4">
+                  <div class="flex justify-between text-xs mb-1">
+                    <span class="text-gray-600">Paid: ৳{{ formatNumber(form.paid_amount) }}</span>
+                    <span class="text-gray-600">Due: ৳{{ formatNumber(remainingBalance) }}</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-green-600 rounded-full h-2 transition-all duration-300" :style="{ width: paymentProgress + '%' }"></div>
+                  </div>
+                  <div class="text-right text-xs text-gray-500 mt-1">{{ paymentProgress.toFixed(1) }}% paid</div>
                 </div>
-                <div class="w-full bg-gray-200 rounded-full h-2">
-                  <div class="bg-green-600 rounded-full h-2 transition-all duration-300" :style="{ width: paymentProgress + '%' }"></div>
-                </div>
-                <div class="text-right text-xs text-gray-500 mt-1">{{ paymentProgress.toFixed(1) }}% paid</div>
-              </div>
 
-              <!-- Average Discount and Tax (Edit Mode) -->
-              <div class="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label class="text-xs font-semibold text-gray-500 uppercase">Avg. Discount (%)</label>
-                  <input type="number" v-model="form.average_discount" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-200 outline-none" step="0.1">
-                </div>
-                <div>
-                  <label class="text-xs font-semibold text-gray-500 uppercase">Avg. Tax (%)</label>
-                  <input type="number" v-model="form.average_tax" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-200 outline-none" step="0.1">
-                </div>
-              </div>
+                <!-- Add New Installment Form -->
+                <div v-if="remainingBalance > 0" class="mt-4 p-4 bg-indigo-50 rounded-xl border border-indigo-200">
+                  <h4 class="text-sm font-bold text-indigo-800 mb-3">
+                    Add Installment #{{ (payments?.length || 0) + 1 }}
+                  </h4>
+                  
+                  <div class="space-y-3">
+                    <div>
+                      <label class="text-xs font-semibold text-indigo-700 block mb-1">Payment Amount (৳)</label>
+                      <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-400">৳</span>
+                        <input 
+                          type="number" 
+                          v-model="newPayment.amount" 
+                          @input="validatePaymentAmount"
+                          class="w-full pl-8 pr-3 py-2 border-2 border-indigo-200 rounded-lg focus:border-indigo-400 outline-none bg-white"
+                          placeholder="0.00"
+                          :max="remainingBalance"
+                          step="0.01"
+                        >
+                      </div>
+                      <p class="text-xs text-indigo-500 mt-1">Maximum: ৳{{ formatNumber(remainingBalance) }}</p>
+                    </div>
 
-              <!-- Add New Installment Form - ALWAYS SHOW when not fully paid -->
-              <div v-if="remainingBalance > 0" class="mt-4 p-4 bg-indigo-50 rounded-xl border border-indigo-200">
-                <h4 class="text-sm font-bold text-indigo-800 mb-3">
-                  Add Installment #{{ payments.length + 1 }}
-                </h4>
-                
-                <div class="space-y-3">
-                  <div>
-                    <label class="text-xs font-semibold text-indigo-700 block mb-1">Payment Amount (৳)</label>
-                    <div class="relative">
-                      <span class="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-400">৳</span>
+                    <div>
+                      <label class="text-xs font-semibold text-indigo-700 block mb-1">Payment Date</label>
                       <input 
-                        type="number" 
-                        v-model="newPayment.amount" 
-                        @input="validatePaymentAmount"
-                        class="w-full pl-8 pr-3 py-2 border-2 border-indigo-200 rounded-lg focus:border-indigo-400 outline-none bg-white"
-                        placeholder="0.00"
-                        :max="remainingBalance"
-                        step="0.01"
+                        type="date" 
+                        v-model="newPayment.date" 
+                        class="w-full px-3 py-2 border-2 border-indigo-200 rounded-lg focus:border-indigo-400 outline-none bg-white"
                       >
                     </div>
-                    <p class="text-xs text-indigo-500 mt-1">Maximum: ৳{{ formatNumber(remainingBalance) }}</p>
-                  </div>
 
-                  <div>
-                    <label class="text-xs font-semibold text-indigo-700 block mb-1">Payment Date</label>
-                    <input 
-                      type="date" 
-                      v-model="newPayment.date" 
-                      class="w-full px-3 py-2 border-2 border-indigo-200 rounded-lg focus:border-indigo-400 outline-none bg-white"
+                    <div>
+                      <label class="text-xs font-semibold text-indigo-700 block mb-1">Payment Method</label>
+                      <select v-model="newPayment.method" class="w-full px-3 py-2 border-2 border-indigo-200 rounded-lg focus:border-indigo-400 outline-none bg-white">
+                        <option value="cash">Cash</option>
+                        <option value="bank_transfer">Bank Transfer</option>
+                        <option value="check">Check</option>
+                        <option value="mobile_banking">Mobile Banking</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label class="text-xs font-semibold text-indigo-700 block mb-1">Reference No (Optional)</label>
+                      <input 
+                        type="text" 
+                        v-model="newPayment.reference_no" 
+                        class="w-full px-3 py-2 border-2 border-indigo-200 rounded-lg focus:border-indigo-400 outline-none bg-white"
+                        placeholder="Check/Transaction number"
+                      >
+                    </div>
+
+                    <button 
+                      @click="addPayment" 
+                      :disabled="!newPayment.amount || newPayment.amount <= 0 || newPayment.amount > remainingBalance"
+                      class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
+                      Add Installment #{{ (payments?.length || 0) + 1 }}
+                    </button>
                   </div>
+                </div>
 
-                  <div>
-                    <label class="text-xs font-semibold text-indigo-700 block mb-1">Payment Method</label>
-                    <select v-model="newPayment.method" class="w-full px-3 py-2 border-2 border-indigo-200 rounded-lg focus:border-indigo-400 outline-none bg-white">
-                      <option value="cash">Cash</option>
-                      <option value="bank_transfer">Bank Transfer</option>
-                      <option value="check">Check</option>
-                      <option value="mobile_banking">Mobile Banking</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label class="text-xs font-semibold text-indigo-700 block mb-1">Reference No (Optional)</label>
-                    <input 
-                      type="text" 
-                      v-model="newPayment.reference_no" 
-                      class="w-full px-3 py-2 border-2 border-indigo-200 rounded-lg focus:border-indigo-400 outline-none bg-white"
-                      placeholder="Check/Transaction number"
-                    >
-                  </div>
-
-                  <button 
-                    @click="addPayment" 
-                    :disabled="!newPayment.amount || newPayment.amount <= 0 || newPayment.amount > remainingBalance"
-                    class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Add Installment #{{ payments.length + 1 }}
-                  </button>
+                <!-- Fully Paid Message -->
+                <div v-if="remainingBalance <= 0 && totalAmount > 0" class="mt-4 p-3 bg-green-100 rounded-lg text-center">
+                  <svg class="w-5 h-5 text-green-600 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span class="text-green-700 font-semibold">Fully Paid!</span>
                 </div>
               </div>
-
-              <!-- Fully Paid Message -->
-              <div v-if="remainingBalance <= 0 && totalAmount > 0" class="mt-4 p-3 bg-green-100 rounded-lg text-center">
-                <svg class="w-5 h-5 text-green-600 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                </svg>
-                <span class="text-green-700 font-semibold">Fully Paid!</span>
-              </div>
-            </div>
 
               <!-- Totals Section -->
               <div class="pt-4 border-t border-gray-200 space-y-2">
@@ -555,12 +545,11 @@ export default {
     // Check if edit mode
     const isEditMode = computed(() => !!route.params.id)
     const purchaseId = computed(() => route.params.id)
-    const purchaseData = ref({})
+    const purchaseData = ref(null)
     
     // Helper function to format date for input
     const formatDateForInput = (date) => {
       if (!date) return new Date().toISOString().split('T')[0]
-      // Handle ISO format: "2026-04-17T00:00:00.000000Z" -> "2026-04-17"
       return date.split('T')[0]
     }
     
@@ -572,66 +561,102 @@ export default {
       status: 'ordered',
       payment_status: 'unpaid',
       paid_amount: 0,
-      new_payment_amount: 0,
       average_discount: 0,
       average_tax: 0
     })
     
+    // Helper function to calculate item total
+    const calculateItemTotalFromValues = (quantity, price, discount, tax) => {
+      const qty = parseFloat(quantity) || 0
+      const prc = parseFloat(price) || 0
+      const disc = parseFloat(discount) || 0
+      const tx = parseFloat(tax) || 0
+      
+      const itemSubtotal = qty * prc
+      const discountAmount = (itemSubtotal * disc) / 100
+      const taxableAmount = itemSubtotal - discountAmount
+      const taxAmount = (taxableAmount * tx) / 100
+      const total = itemSubtotal - discountAmount + taxAmount
+      
+      return isNaN(total) ? 0 : total
+    }
+    
+    // Update item methods
+    const updateItemQuantity = (index, value) => {
+      if (cart.value[index]) {
+        cart.value[index].quantity = parseFloat(value) || 0
+      }
+    }
+    
+    const updateItemPrice = (index, value) => {
+      if (cart.value[index]) {
+        cart.value[index].purchase_price = parseFloat(value) || 0
+      }
+    }
+    
+    const updateItemDiscount = (index, value) => {
+      if (cart.value[index]) {
+        cart.value[index].discount = parseFloat(value) || 0
+      }
+    }
+    
+    const updateItemTax = (index, value) => {
+      if (cart.value[index]) {
+        cart.value[index].tax = parseFloat(value) || 0
+      }
+    }
+    
     // Computed Properties
-// Computed Properties
-const subtotal = computed(() => {
-  let sum = 0
-  for (const item of cart.value) {
-    const qty = parseFloat(item.quantity) || 0
-    const price = parseFloat(item.purchase_price) || 0
-    sum += qty * price
-  }
-  console.log('Subtotal calculated:', sum)
-  return sum
-})
-
-const totalDiscount = computed(() => {
-  let sum = 0
-  for (const item of cart.value) {
-    const qty = parseFloat(item.quantity) || 0
-    const price = parseFloat(item.purchase_price) || 0
-    const discount = parseFloat(item.discount) || 0
-    const itemSubtotal = qty * price
-    const discountAmount = (itemSubtotal * discount) / 100
-    sum += isNaN(discountAmount) ? 0 : discountAmount
-  }
-  console.log('Total Discount calculated:', sum)
-  return sum
-})
-
-const totalTax = computed(() => {
-  let sum = 0
-  for (const item of cart.value) {
-    const qty = parseFloat(item.quantity) || 0
-    const price = parseFloat(item.purchase_price) || 0
-    const discount = parseFloat(item.discount) || 0
-    const tax = parseFloat(item.tax) || 0
-    const itemSubtotal = qty * price
-    const discountAmount = (itemSubtotal * discount) / 100
-    const taxableAmount = itemSubtotal - discountAmount
-    const taxAmount = (taxableAmount * tax) / 100
-    sum += isNaN(taxAmount) ? 0 : taxAmount
-  }
-  console.log('Total Tax calculated:', sum)
-  return sum
-})
-
-const totalAmount = computed(() => {
-  const amount = subtotal.value - totalDiscount.value + totalTax.value
-  console.log('Total Amount calculated:', amount)
-  return isNaN(amount) ? 0 : amount
-})
+    const subtotal = computed(() => {
+      let sum = 0
+      if (!cart.value || cart.value.length === 0) return sum
+      for (const item of cart.value) {
+        const qty = parseFloat(item?.quantity) || 0
+        const price = parseFloat(item?.purchase_price) || 0
+        sum += qty * price
+      }
+      return sum
+    })
     
-    const taxableAmount = computed(() => subtotal.value - totalDiscount.value)
+    const totalDiscount = computed(() => {
+      let sum = 0
+      if (!cart.value || cart.value.length === 0) return sum
+      for (const item of cart.value) {
+        const qty = parseFloat(item?.quantity) || 0
+        const price = parseFloat(item?.purchase_price) || 0
+        const discount = parseFloat(item?.discount) || 0
+        const itemSubtotal = qty * price
+        const discountAmount = (itemSubtotal * discount) / 100
+        sum += isNaN(discountAmount) ? 0 : discountAmount
+      }
+      return sum
+    })
     
+    const totalTax = computed(() => {
+      let sum = 0
+      if (!cart.value || cart.value.length === 0) return sum
+      for (const item of cart.value) {
+        const qty = parseFloat(item?.quantity) || 0
+        const price = parseFloat(item?.purchase_price) || 0
+        const discount = parseFloat(item?.discount) || 0
+        const tax = parseFloat(item?.tax) || 0
+        const itemSubtotal = qty * price
+        const discountAmount = (itemSubtotal * discount) / 100
+        const taxableAmount = itemSubtotal - discountAmount
+        const taxAmount = (taxableAmount * tax) / 100
+        sum += isNaN(taxAmount) ? 0 : taxAmount
+      }
+      return sum
+    })
+    
+    const totalAmount = computed(() => {
+      const amount = subtotal.value - totalDiscount.value + totalTax.value
+      return isNaN(amount) ? 0 : amount
+    })
     
     const totalQuantity = computed(() => {
-      return cart.value.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0)
+      if (!cart.value || cart.value.length === 0) return 0
+      return cart.value.reduce((sum, item) => sum + (parseFloat(item?.quantity) || 0), 0)
     })
     
     const paymentProgress = computed(() => {
@@ -645,13 +670,14 @@ const totalAmount = computed(() => {
     const canSubmit = computed(() => {
       return form.supplier_id && 
              form.warehouse_id && 
-             cart.value.length > 0
+             cart.value && cart.value.length > 0
     })
     
-const remainingBalance = computed(() => {
-  const balance = totalAmount.value - form.paid_amount
-  return isNaN(balance) ? 0 : Math.max(0, balance)
-})  
+    const remainingBalance = computed(() => {
+      const balance = totalAmount.value - form.paid_amount
+      return isNaN(balance) ? 0 : Math.max(0, balance)
+    })
+    
     // Methods
     const formatNumber = (value) => {
       const num = parseFloat(value || 0)
@@ -662,15 +688,6 @@ const remainingBalance = computed(() => {
       if (!date) return 'N/A'
       const d = new Date(date)
       return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString('en-BD')
-    }
-    
-    const getPaymentStatusLabel = (status) => {
-      const labels = {
-        unpaid: '💰 Unpaid',
-        partial: '💳 Partial',
-        paid: '✅ Paid'
-      }
-      return labels[status] || status
     }
     
     const getPaymentMethodLabel = (method) => {
@@ -693,33 +710,6 @@ const remainingBalance = computed(() => {
       }
     }
     
-    const calculateItemTotal = (item) => {
-  if (!item) return
-  
-  const quantity = parseFloat(item.quantity) || 0
-  const price = parseFloat(item.purchase_price) || 0
-  const discount = parseFloat(item.discount) || 0
-  const tax = parseFloat(item.tax) || 0
-  
-  const itemSubtotal = quantity * price
-  const discountAmount = (itemSubtotal * discount) / 100
-  const taxableAmount = itemSubtotal - discountAmount
-  const taxAmount = (taxableAmount * tax) / 100
-  const total = itemSubtotal - discountAmount + taxAmount
-  
-  item.total = isNaN(total) ? 0 : total
-  
-  // Also store the calculated values for debugging
-  item._calculated = {
-    subtotal: itemSubtotal,
-    discountAmount: discountAmount,
-    taxAmount: taxAmount,
-    total: total
-  }
-  
-  return item.total
-}
-    
     const searchProducts = () => {
       clearTimeout(searchTimeout.value)
       
@@ -733,29 +723,31 @@ const remainingBalance = computed(() => {
           const response = await api.get('/products', {
             params: { search: searchQuery.value, per_page: 20 }
           })
-          searchResults.value = response.data.data || response.data
+          const data = response.data?.data || response.data || []
+          searchResults.value = Array.isArray(data) ? data : []
         } catch (error) {
           console.error('Product search failed:', error)
+          searchResults.value = []
         }
       }, 300)
     }
     
     const addToCart = (product) => {
-      const existing = cart.value.find(item => item.product_id === product.id)
+      if (!product || !product.id) return
       
-      if (existing) {
-        existing.quantity += 1
-        calculateItemTotal(existing)
+      const existingIndex = cart.value.findIndex(item => item.product_id === product.id)
+      
+      if (existingIndex !== -1) {
+        cart.value[existingIndex].quantity = (cart.value[existingIndex].quantity || 0) + 1
       } else {
         cart.value.push({
           product_id: product.id,
-          name: product.name,
-          sku: product.sku || product.code,
+          name: product.name || 'Unknown Product',
+          sku: product.sku || product.code || '-',
           quantity: 1,
           purchase_price: parseFloat(product.purchase_price || product.cost_price || 0),
           discount: 0,
-          tax: 0,
-          total: parseFloat(product.purchase_price || product.cost_price || 0)
+          tax: 0
         })
       }
       
@@ -764,97 +756,105 @@ const remainingBalance = computed(() => {
     }
     
     const removeFromCart = (index) => {
-      cart.value.splice(index, 1)
+      if (index >= 0 && index < cart.value.length) {
+        cart.value.splice(index, 1)
+      }
     }
     
     const loadSuppliers = async () => {
       try {
         const response = await api.get('/suppliers')
-        suppliers.value = response.data.data || response.data
+        const data = response.data?.data || response.data || []
+        suppliers.value = Array.isArray(data) ? data : []
       } catch (error) {
         console.error('Failed to load suppliers:', error)
+        suppliers.value = []
       }
     }
     
     const loadWarehouses = async () => {
-      try {
-        const response = await api.get('/warehouses')
-        warehouses.value = response.data.data || response.data
-      } catch (error) {
-        console.error('Failed to load warehouses:', error)
-      }
-    }
-    
-  const loadPurchaseData = async () => {
-    if (!isEditMode.value) return
-    
-    loading.value = true
     try {
-      const response = await api.get(`/purchases/${purchaseId.value}`)
-      console.log('API Response:', response.data)
-      
-      // Check if response has the expected structure
-      let data
-      if (response.data.data) {
-        data = response.data.data
-      } else if (response.data.success && response.data.data) {
-        data = response.data.data
-      } else {
-        data = response.data
+      // Try the dropdown endpoint first
+      let response;
+      try {
+        response = await api.get('/warehouses/dropdown');
+      } catch (e) {
+        // Fallback to regular endpoint
+        response = await api.get('/warehouses?all=true');
       }
       
-      console.log('Purchase data:', data)
-      purchaseData.value = data
-      
-      // Set form values with proper date formatting
-      form.supplier_id = data.supplier_id
-      form.warehouse_id = data.warehouse_id
-      form.purchase_date = formatDateForInput(data.purchase_date)
-      form.status = data.status
-      form.payment_status = data.payment_status
-      form.paid_amount = parseFloat(data.paid_amount) || 0
-      
-      // Load cart items with proper mapping
-      if (data.items && Array.isArray(data.items)) {
-        cart.value = data.items.map(item => {
-          const cartItem = {
-            id: item.id,
-            product_id: item.product_id,
-            name: item.product?.name || 'Product',
-            sku: item.product?.sku || item.product?.code,
-            quantity: parseFloat(item.quantity) || 0,
-            purchase_price: parseFloat(item.purchase_price) || 0,
-            discount: parseFloat(item.discount_percent) || 0,
-            tax: parseFloat(item.tax_percent) || 0,
-            total: parseFloat(item.total) || 0
-          }
-          
-          // Recalculate total to ensure it's correct
-          calculateItemTotal(cartItem)
-          
-          return cartItem
-        })
-      } else {
-        cart.value = []
+      // Handle different response formats
+      let data = [];
+      if (response.data?.success && response.data.data) {
+        data = response.data.data;
+      } else if (response.data?.data) {
+        data = response.data.data;
+      } else if (Array.isArray(response.data)) {
+        data = response.data;
       }
       
-      // Load payments
-      payments.value = data.payments || []
+      warehouses.value = Array.isArray(data) ? data : [];
+      console.log('Warehouses loaded:', warehouses.value);
       
-      console.log('Loaded cart items:', cart.value)
-      console.log('Subtotal:', subtotal.value)
-      console.log('Total Amount:', totalAmount.value)
-      
+      if (warehouses.value.length === 0) {
+        console.warn('No warehouses found. Please create a warehouse first.');
+      }
     } catch (error) {
-      console.error('Failed to load purchase:', error)
-      console.error('Error response:', error.response)
-      const errorMessage = error.response?.data?.message || error.message || 'Failed to load purchase details'
-      alert(errorMessage)
-      router.push('/purchases')
-    } finally {
-      loading.value = false
+      console.error('Failed to load warehouses:', error);
+      warehouses.value = [];
     }
   }
+    
+    const loadPurchaseData = async () => {
+      if (!isEditMode.value) return
+      
+      loading.value = true
+      try {
+        const response = await api.get(`/purchases/${purchaseId.value}`)
+        
+        let data = {}
+        if (response.data?.data) {
+          data = response.data.data
+        } else if (response.data?.success && response.data.data) {
+          data = response.data.data
+        } else {
+          data = response.data || {}
+        }
+        
+        purchaseData.value = data
+        
+        // Set form values
+        form.supplier_id = data.supplier_id || ''
+        form.warehouse_id = data.warehouse_id || ''
+        form.purchase_date = formatDateForInput(data.purchase_date)
+        form.status = data.status || 'ordered'
+        form.payment_status = data.payment_status || 'unpaid'
+        form.paid_amount = parseFloat(data.paid_amount) || 0
+        
+        // Load cart items
+        const items = data.items && Array.isArray(data.items) ? data.items : []
+        cart.value = items.map(item => ({
+          product_id: item.product_id,
+          name: item.product?.name || `Product ID: ${item.product_id}`,
+          sku: item.product?.sku || '-',
+          quantity: parseFloat(item.quantity) || 0,
+          purchase_price: parseFloat(item.purchase_price) || 0,
+          discount: parseFloat(item.discount_percent) || 0,
+          tax: parseFloat(item.tax_percent) || 0
+        }))
+        
+        // Load payments
+        payments.value = (data.payments && Array.isArray(data.payments)) ? data.payments : []
+        
+      } catch (error) {
+        console.error('Failed to load purchase:', error)
+        const errorMessage = error.response?.data?.message || error.message || 'Failed to load purchase details'
+        alert(errorMessage)
+        router.push('/purchases')
+      } finally {
+        loading.value = false
+      }
+    }
     
     const addPayment = async () => {
       if (!newPayment.amount || newPayment.amount <= 0) {
@@ -877,12 +877,11 @@ const remainingBalance = computed(() => {
           reference_no: newPayment.reference_no || null
         })
         
-        const newPaidAmount = form.paid_amount + parseFloat(newPayment.amount)
-        form.paid_amount = newPaidAmount
+        form.paid_amount = form.paid_amount + parseFloat(newPayment.amount)
         
-        if (newPaidAmount >= totalAmount.value) {
+        if (form.paid_amount >= totalAmount.value) {
           form.payment_status = 'paid'
-        } else if (newPaidAmount > 0) {
+        } else if (form.paid_amount > 0) {
           form.payment_status = 'partial'
         }
         
@@ -893,7 +892,7 @@ const remainingBalance = computed(() => {
         newPayment.reference_no = ''
         newPayment.date = new Date().toISOString().split('T')[0]
         
-        // Reload purchase data to get updated payments
+        // Reload purchase data
         await loadPurchaseData()
       } catch (error) {
         console.error('Add payment failed:', error)
@@ -904,7 +903,7 @@ const remainingBalance = computed(() => {
     }
     
     const receivePurchase = async () => {
-      if (!confirm(`Mark purchase ${purchaseData.value.reference_no} as received? This will update inventory.`)) return
+      if (!purchaseData.value || !confirm(`Mark purchase ${purchaseData.value.reference_no || 'this order'} as received? This will update inventory.`)) return
       
       loading.value = true
       try {
@@ -928,7 +927,7 @@ const remainingBalance = computed(() => {
       
       try {
         if (isEditMode.value) {
-          // Update existing purchase - only payment and status
+          // Update existing purchase
           const payload = {
             paid_amount: parseFloat(form.paid_amount) || 0,
             payment_status: form.payment_status,
@@ -945,9 +944,17 @@ const remainingBalance = computed(() => {
             finalPaidAmount = totalAmount.value
           }
           
+          const validItems = cart.value.filter(item => item.product_id && item.quantity > 0)
+          
+          if (validItems.length === 0) {
+            alert('Please add at least one valid item to the purchase')
+            loading.value = false
+            return
+          }
+          
           const payload = {
-            supplier_id: form.supplier_id,
-            warehouse_id: form.warehouse_id,
+            supplier_id: parseInt(form.supplier_id),
+            warehouse_id: parseInt(form.warehouse_id),
             purchase_date: form.purchase_date,
             status: form.status,
             payment_status: form.payment_status,
@@ -956,11 +963,8 @@ const remainingBalance = computed(() => {
             total_discount: totalDiscount.value,
             total_tax: totalTax.value,
             total_amount: totalAmount.value,
-            discount_percent: form.average_discount,
-            tax_percent: form.average_tax,
-            shipping_cost: 0,
-            items: cart.value.map(item => ({
-              product_id: item.product_id,
+            items: validItems.map(item => ({
+              product_id: parseInt(item.product_id),
               quantity: parseFloat(item.quantity),
               purchase_price: parseFloat(item.purchase_price),
               discount_percent: parseFloat(item.discount || 0),
@@ -982,7 +986,7 @@ const remainingBalance = computed(() => {
     }
     
     const deletePurchase = async () => {
-      if (!confirm(`Are you sure you want to delete purchase ${purchaseData.value.reference_no}? This action cannot be undone.`)) return
+      if (!purchaseData.value || !confirm(`Are you sure you want to delete purchase ${purchaseData.value.reference_no || 'this order'}? This action cannot be undone.`)) return
       
       loading.value = true
       try {
@@ -997,7 +1001,7 @@ const remainingBalance = computed(() => {
       }
     }
     
-    // Watch for paid amount to auto-update payment status (for create mode)
+    // Watchers
     watch(() => form.paid_amount, (newVal) => {
       if (!isEditMode.value) {
         const paid = parseFloat(newVal) || 0
@@ -1012,24 +1016,13 @@ const remainingBalance = computed(() => {
       }
     })
     
-    // Watch for total amount changes to validate paid amount
     watch(totalAmount, (newTotal) => {
       if (parseFloat(form.paid_amount) > newTotal) {
         form.paid_amount = newTotal
       }
     })
-
-    // Watch for cart changes to recalculate totals
-watch(cart, () => {
-  console.log('Cart changed, recalculating totals...')
-  // Force recalculation by accessing computed properties
-  subtotal.value
-  totalDiscount.value
-  totalTax.value
-  totalAmount.value
-}, { deep: true })
     
-    // Initialize on mount - single onMounted
+    // Initialize
     onMounted(async () => {
       await Promise.all([loadSuppliers(), loadWarehouses()])
       
@@ -1061,10 +1054,13 @@ watch(cart, () => {
       canSubmit,
       formatNumber,
       formatDate,
-      getPaymentStatusLabel,
       getPaymentMethodLabel,
       validatePaymentAmount,
-      calculateItemTotal,
+      calculateItemTotalFromValues,
+      updateItemQuantity,
+      updateItemPrice,
+      updateItemDiscount,
+      updateItemTax,
       searchProducts,
       addToCart,
       removeFromCart,

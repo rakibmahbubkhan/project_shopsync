@@ -374,7 +374,7 @@ class PurchaseController extends Controller
             }
 
             return DB::transaction(function () use ($purchase) {
-                // Update stock for all items
+                // Update stock for all items using StockService
                 foreach ($purchase->items as $item) {
                     $this->stockService->increaseStock(
                         $item->product_id,
@@ -383,7 +383,8 @@ class PurchaseController extends Controller
                         (float) $item->purchase_price,
                         'purchase_receive',
                         $purchase->id,
-                        Auth::id()
+                        Auth::id(),
+                        "Purchase #{$purchase->reference_no} received"
                     );
                 }
 

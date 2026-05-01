@@ -179,6 +179,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('purchases/{purchase}/payments', [PurchaseController::class, 'addPayment']);
     Route::get('purchases/{purchase}/items', [PurchaseController::class, 'getItems']);
 
+
     // 5. Stock Operations
     // Route::apiResource('stock-transfers', StockTransferController::class);
     Route::get('/stock-transfers/warehouses', [StockTransferController::class, 'getWarehouses']); // Add this line
@@ -235,6 +236,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     Route::apiResource('warehouses', WarehouseController::class);
+    Route::get('warehouses/dropdown', [WarehouseController::class, 'getDropdown']);
+
 
     // 11. POS Init Data
     Route::get('/pos/init', function() {
