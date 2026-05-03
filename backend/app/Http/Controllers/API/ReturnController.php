@@ -99,7 +99,7 @@ class ReturnController extends Controller
             Log::info('Return store started', [
                 'sale_id' => $request->sale_id,
                 'items_count' => count($request->items ?? []),
-                'user_id' => auth()->id()
+                'user_id' => Auth::id()
             ]);
 
             $validated = $request->validate([

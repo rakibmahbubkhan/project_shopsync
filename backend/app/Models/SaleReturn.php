@@ -33,6 +33,11 @@ class SaleReturn extends Model
     protected $hidden = [];
 
     // Relationships
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class);
+    }
+
     public function sale(): BelongsTo
     {
         return $this->belongsTo(Sale::class);
@@ -43,9 +48,14 @@ class SaleReturn extends Model
         return $this->belongsTo(User::class, 'user_id');
     }
 
-    public function items(): HasMany
+    // public function items(): HasMany
+    // {
+    //     return $this->hasMany(SaleReturnItem::class);
+    // }
+
+    public function items()
     {
-        return $this->hasMany(SaleReturnItem::class);
+        return $this->hasMany(SaleReturnItem::class, 'sale_return_id');
     }
 
     public function refund(): HasMany
