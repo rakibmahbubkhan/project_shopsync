@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class SaleReturn extends Model
 {
@@ -58,10 +59,15 @@ class SaleReturn extends Model
         return $this->hasMany(SaleReturnItem::class, 'sale_return_id');
     }
 
-    public function refund(): HasMany
-    {
-        return $this->hasMany(Refund::class);
-    }
+    // public function refund(): HasMany
+    // {
+    //     return $this->hasMany(Refund::class);
+    // }
+
+    public function refund(): HasOne
+{
+    return $this->hasOne(Refund::class);
+}
 
     /**
      * FIXED: Renamed from approvedBy() to approver()
@@ -106,5 +112,10 @@ class SaleReturn extends Model
     public function reject(): void
     {
         $this->update(['status' => 'rejected']);
+    }
+
+    public function processedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
     }
 }

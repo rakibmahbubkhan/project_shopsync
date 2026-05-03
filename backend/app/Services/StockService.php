@@ -606,4 +606,58 @@ class StockService
             })->sortByDesc('value')->take(10)
         ];
     }
+
+    /**
+ * Prepare a sale return (create the SaleReturn record)
+ *
+ * @param Sale $sale
+ * @param int $productId
+ * @param int $quantity
+ * @param int $processedBy
+ * @param string $reason
+ * @return SaleReturn
+ * @throws \Exception
+ */
+    public function prepareSaleReturn($sale, $productId, $quantity, $processedBy, $reason)
+    {
+        // Get the original sale item
+        $saleItem = SaleItem::where('sale_id', $sale->id)
+            ->where('product_id', $productId)
+            ->firstOrFail();
+
+        // Calculate refund amount (e.g., selling price)
+        $refundAmount = $quantity * $saleItem->selling_price;
+
+        // Create and return a single SaleReturn model
+        return SaleReturn::create([
+            'sale_id'        => $sale->id,
+            'product_id'     => $productId,
+            'quantity'       => $quantity,
+            'refund_amount'  => $refundAmount,
+            'cost_price'     => $saleItem->cost_price,
+            'profit_reversed'=> ($saleItem->gross_profit / $saleItem->quantity) * $quantity,
+            'processed_by'   => $processedBy,
+            'reason'         => $reason,
+            'payment_method' => request()->payment_method ?? 'cash', // adjust as needed
+            'status'         => 'pending',
+        ]);
+    }
+
+    public function finalizeSaleReturn(SaleReturn $return): void
+    {
+        // Increase stock back
+        $this->increaseStock(
+            $return->product_id,
+            $return->sale->warehouse_id,
+            $return->quantity,
+            $return->cost_price,
+            'return_approval',
+            $return->id,
+            $return->processed_by
+        );
+        
+        // Update return status if needed
+        // (already approved)
+    }
+
 }

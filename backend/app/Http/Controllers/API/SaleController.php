@@ -162,7 +162,7 @@ public function store(StoreSaleRequest $request)
             'items.product',
             'returns.product',
             'returns.refund',
-            'returns.processedBy'
+            'returns.user',
         ]);
         
         return new SaleResource($sale);
@@ -434,7 +434,7 @@ public function receipt(Sale $sale)
                 }
 
                 // Load relationships carefully
-                $return->load(['product', 'processedBy']);
+                $return->load(['product', 'user']);
                 $sale->load(['returns' => function($query) {
                     $query->with(['product', 'refund']);
                 }]);
@@ -461,7 +461,7 @@ public function receipt(Sale $sale)
             'sale.customer',
             'sale.warehouse',
             'product',
-            'processedBy',
+            'user',
             'refund'
         ]);
 
