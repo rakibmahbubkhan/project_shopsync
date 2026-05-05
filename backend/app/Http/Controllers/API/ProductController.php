@@ -6,6 +6,12 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use App\Services\StockService;
 use App\Models\ProductStock;
+use App\Http\Resources\ProductResource;
+use App\Models\Warehouse;
+use App\Models\Category;
+use App\Models\Brand;
+use App\Models\Unit;
+use App\Models\DamagedProduct;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -27,76 +33,77 @@ class ProductController extends Controller
 
 
     public function index(Request $request)
-    {
-        $cacheKey = 'products_' . md5(json_encode($request->all()));
-        
-        $products = Cache::remember($cacheKey, now()->addMinutes(5), function() use ($request) {
-            // Build the query with stock calculation
-            $query = Product::with(['category:id,name', 'brand:id,name', 'unit:id,name'])
-                ->leftJoin('product_stocks', 'products.id', '=', 'product_stocks.product_id')
-                ->select(
-                    'products.*',
-                    DB::raw('COALESCE(SUM(product_stocks.quantity), 0) as real_stock_quantity')
-                )
-                ->groupBy('products.id');
-            
-            // Apply search filter
-            if ($request->search) {
-                $query->where(function($q) use ($request) {
-                    $q->where('products.name', 'like', "%{$request->search}%")
-                      ->orWhere('products.sku', 'like', "%{$request->search}%");
-                });
-            }
-            
-            // Apply category filter
-            if ($request->category_id) {
-                $query->where('products.category_id', $request->category_id);
-            }
-            
-            // Apply warehouse filter (if specific warehouse is selected)
-            if ($request->warehouse_id) {
-                $query->where('product_stocks.warehouse_id', $request->warehouse_id);
-            }
-            
-            // Sorting - allow sorting by real stock quantity
-            $sortField = $request->sort_by;
-            $order = $request->order === 'asc' ? 'asc' : 'desc';
-            
-            switch ($sortField) {
-                case 'name':
-                    $query->orderBy('products.name', $order);
-                    break;
-                case 'sku':
-                    $query->orderBy('products.sku', $order);
-                    break;
-                case 'price':
-                case 'selling_price':
-                    $query->orderBy('products.selling_price', $order);
-                    break;
-                case 'stock_quantity':
-                case 'real_stock':
-                    $query->orderBy('real_stock_quantity', $order);
-                    break;
-                default:
-                    $query->orderBy('products.created_at', $order);
-                    break;
-            }
-            
-            $perPage = $request->per_page ?? 10;
-            $results = $query->paginate($perPage);
-            
-            // Transform the results to include real_stock as stock_quantity for frontend compatibility
-            $results->getCollection()->transform(function ($product) {
-                $product->stock_quantity = $product->real_stock_quantity;
-                return $product;
-            });
-            
-            return $results;
-        });
-        
-        return response()->json($products);
-    }
+{
+    $cacheKey = 'products_' . md5(json_encode($request->all()));
 
+    $products = Cache::remember($cacheKey, now()->addMinutes(5), function() use ($request) {
+        $query = Product::with(['category:id,name', 'brand:id,name', 'unit:id,name']);
+
+        // Join product_stocks with optional warehouse condition
+        $query->leftJoin('product_stocks', function($join) use ($request) {
+            $join->on('products.id', '=', 'product_stocks.product_id');
+            if ($request->filled('warehouse_id')) {
+                $join->where('product_stocks.warehouse_id', $request->warehouse_id);
+            }
+        });
+
+        // Select product columns and aggregated stock quantity
+        $query->select(
+            'products.*',
+            DB::raw('COALESCE(SUM(product_stocks.quantity), 0) as real_stock_quantity')
+        )->groupBy('products.id');
+
+        // Search filter
+        if ($request->filled('search')) {
+            $query->where(function($q) use ($request) {
+                $q->where('products.name', 'like', "%{$request->search}%")
+                  ->orWhere('products.sku', 'like', "%{$request->search}%");
+            });
+        }
+
+        // Category filter
+        if ($request->filled('category_id')) {
+            $query->where('products.category_id', $request->category_id);
+        }
+
+        // Sorting
+        $sortField = $request->get('sort_by');
+        $order = $request->get('order', 'desc') === 'asc' ? 'asc' : 'desc';
+
+        switch ($sortField) {
+            case 'name':
+                $query->orderBy('products.name', $order);
+                break;
+            case 'sku':
+                $query->orderBy('products.sku', $order);
+                break;
+            case 'price':
+            case 'selling_price':
+                $query->orderBy('products.selling_price', $order);
+                break;
+            case 'stock_quantity':
+            case 'real_stock':
+                $query->orderBy('real_stock_quantity', $order);
+                break;
+            default:
+                $query->orderBy('products.created_at', $order);
+                break;
+        }
+
+        $perPage = $request->get('per_page', 10);
+        $results = $query->paginate($perPage);
+
+        // Add virtual stock_quantity attribute for frontend compatibility
+        $results->getCollection()->transform(function ($product) {
+            $product->stock_quantity = $product->real_stock_quantity;
+            return $product;
+        });
+
+        return $results;
+    });
+
+    return ProductResource::collection($products);
+}
 
     /**
      * Get form data (categories, brands, units, warehouses)
@@ -107,10 +114,10 @@ class ProductController extends Controller
         
         $data = Cache::remember($cacheKey, now()->addHours(6), function() {
             return [
-                'categories' => \App\Models\Category::select('id', 'name')->get(),
-                'brands' => \App\Models\Brand::select('id', 'name')->get(),
-                'units' => \App\Models\Unit::select('id', 'name')->get(),
-                'warehouses' => \App\Models\Warehouse::select('id', 'name')->get(),
+                'categories' => Category::select('id', 'name')->get(),
+                'brands' => Brand::select('id', 'name')->get(),
+                'units' => Unit::select('id', 'name')->get(),
+                'warehouses' => Warehouse::select('id', 'name')->get(),
             ];
         });
         
@@ -341,7 +348,7 @@ class ProductController extends Controller
         
         DB::transaction(function () use ($validated) {
             foreach ($validated['updates'] as $update) {
-                \App\Models\ProductStock::updateOrCreate(
+                ProductStock::updateOrCreate(
                     [
                         'product_id' => $update['product_id'],
                         'warehouse_id' => $update['warehouse_id'],
@@ -354,5 +361,137 @@ class ProductController extends Controller
         $this->clearProductCache();
         
         return response()->json(['message' => 'Stock updated successfully']);
+    }
+
+    // app/Http/Controllers/API/ProductController.php (add these methods)
+
+    /**
+     * List damaged products (with optional warehouse filter)
+     */
+    public function damagedProducts(Request $request)
+    {
+        $query = DamagedProduct::with(['product:id,name,sku', 'warehouse:id,name'])
+            ->select('damaged_products.*'); // ensure correct table
+        
+        if ($request->filled('warehouse_id')) {
+            $query->where('warehouse_id', $request->warehouse_id);
+        }
+        
+        // optional search by product name
+        if ($request->filled('search')) {
+            $query->whereHas('product', function($q) use ($request) {
+                $q->where('name', 'like', "%{$request->search}%")->orWhere('sku', 'like', "%{$request->search}%");
+            });
+        }
+        
+        $perPage = $request->get('per_page', 10);
+        $damaged = $query->orderBy('report_date', 'desc')->paginate($perPage);
+        
+        return response()->json($damaged);
+    }
+
+    /**
+     * Store a new damaged product record
+     */
+    public function storeDamaged(Request $request)
+    {
+        $validated = $request->validate([
+            'product_id'   => 'required|exists:products,id',
+            'warehouse_id' => 'required|exists:warehouses,id',
+            'quantity'     => 'required|integer|min:1',
+            'report_date'  => 'required|date',
+            'notes'        => 'nullable|string|max:500',
+        ]);
+        
+        $damaged = DamagedProduct::create($validated);
+        
+        // Optional: Automatically reduce stock in product_stocks table
+        $this->reduceStockForDamaged($damaged);
+        
+        return response()->json([
+            'message' => 'Damaged product recorded successfully',
+            'data'    => $damaged->load(['product', 'warehouse'])
+        ], 201);
+    }
+
+    /**
+     * Update damaged product record
+     */
+    public function updateDamaged(Request $request, $id)
+    {
+        $damaged = DamagedProduct::findOrFail($id);
+        
+        $validated = $request->validate([
+            'product_id'   => 'sometimes|exists:products,id',
+            'warehouse_id' => 'sometimes|exists:warehouses,id',
+            'quantity'     => 'sometimes|integer|min:1',
+            'report_date'  => 'sometimes|date',
+            'notes'        => 'nullable|string|max:500',
+        ]);
+        
+        // Before updating, adjust stock difference if quantity changes
+        $oldQty = $damaged->quantity;
+        $damaged->update($validated);
+        
+        if (isset($validated['quantity']) && $validated['quantity'] != $oldQty) {
+            $this->adjustStockForDamagedUpdate($damaged, $oldQty);
+        }
+        
+        return response()->json([
+            'message' => 'Damaged record updated',
+            'data'    => $damaged->load(['product', 'warehouse'])
+        ]);
+    }
+
+    /**
+     * Delete damaged product record
+     */
+    public function destroyDamaged($id)
+    {
+        $damaged = DamagedProduct::findOrFail($id);
+        
+        // Restore stock before deletion
+        $this->restoreStockFromDamaged($damaged);
+        
+        $damaged->delete();
+        
+        return response()->json(['message' => 'Damaged record deleted successfully']);
+    }
+
+    // --- Helper methods for stock management (optional) ---
+    private function reduceStockForDamaged(DamagedProduct $damaged)
+    {
+        $stock = ProductStock::where('product_id', $damaged->product_id)
+            ->where('warehouse_id', $damaged->warehouse_id)
+            ->first();
+        
+        if ($stock) {
+            $newQty = max(0, $stock->quantity - $damaged->quantity);
+            $stock->update(['quantity' => $newQty]);
+        }
+    }
+
+    private function adjustStockForDamagedUpdate(DamagedProduct $damaged, $oldQty)
+    {
+        $stock = ProductStock::where('product_id', $damaged->product_id)
+            ->where('warehouse_id', $damaged->warehouse_id)
+            ->first();
+        
+        if ($stock) {
+            $difference = $oldQty - $damaged->quantity; // positive means we give back stock
+            $newQty = max(0, $stock->quantity + $difference);
+            $stock->update(['quantity' => $newQty]);
+        }
+    }
+
+    private function restoreStockFromDamaged(DamagedProduct $damaged)
+    {
+        $stock = ProductStock::where('product_id', $damaged->product_id)
+            ->where('warehouse_id', $damaged->warehouse_id)
+            ->first();
+        
+        if ($stock) {
+            $stock->increment('quantity', $damaged->quantity);
+        }
     }
 }

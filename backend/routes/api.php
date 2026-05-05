@@ -138,6 +138,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('categories', CategoryController::class)->only(['index']);
     Route::get('units', [UnitController::class, 'index']);
     Route::apiResource('products', ProductController::class);
+    // Damaged Products CRUD
+    Route::get('/products/damaged', [ProductController::class, 'damagedProducts']);
+    Route::post('/products/damaged', [ProductController::class, 'storeDamaged']);
+    Route::put('/products/damaged/{id}', [ProductController::class, 'updateDamaged']);
+    Route::delete('/products/damaged/{id}', [ProductController::class, 'destroyDamaged']);
     Route::apiResource('categories', CategoryController::class);
 
     // 2.1 Tax Management

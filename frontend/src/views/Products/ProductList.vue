@@ -89,6 +89,33 @@
         </div>
       </div>
 
+      <!-- Warehouse Filter Bar -->
+      <div class="mb-4 bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+            </div>
+            <span class="text-sm font-semibold text-gray-700">Filter by Warehouse</span>
+          </div>
+          <select 
+            v-model="selectedWarehouse" 
+            class="w-full sm:w-64 border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all bg-white"
+          >
+            <option value="">🏭 All Warehouses</option>
+            <option 
+              v-for="warehouse in warehouses" 
+              :key="warehouse.id" 
+              :value="warehouse.id"
+            >
+              📦 {{ warehouse.name }}
+            </option>
+          </select>
+        </div>
+      </div>
+
       <!-- Products Table -->
       <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div class="p-4 sm:p-6 border-b border-gray-100">
@@ -98,7 +125,7 @@
         
         <div class="overflow-x-auto">
           <SmartTable
-            endpoint="/products"
+            :endpoint="productsEndpoint"
             :columns="columns"
             ref="productTable"
             :key="tableKey"
@@ -277,7 +304,7 @@
                   <div class="relative inline-block">
                     <img 
                       :src="imagePreview" 
-            alt="Product preview" 
+                      alt="Product preview" 
                       class="w-32 h-32 object-cover rounded-lg border-2 border-gray-200"
                     />
                     <button 
@@ -464,7 +491,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from "vue";
+import { ref, reactive, onMounted, computed, watch } from "vue";
 import SmartTable from "@/components/SmartTable.vue";
 import api from '@/api/axios';
 
@@ -478,12 +505,24 @@ const totalProducts = ref(0);
 const lowStockCount = ref(0);
 const totalValue = ref(0);
 
+// Warehouse filtering
+const warehouses = ref([]);
+const selectedWarehouse = ref('');
+
+// Computed endpoint that includes warehouse_id as query param
+const productsEndpoint = computed(() => {
+  let url = '/products';
+  if (selectedWarehouse.value) {
+    url += `?warehouse_id=${selectedWarehouse.value}`;
+  }
+  return url;
+});
+
 // Modal state
 const showModal = ref(false);
 const isEditing = ref(false);
 const isSubmitting = ref(false);
 const editingId = ref(null);
-
 
 const imagePreview = ref(null);
 const imageInput = ref(null);
@@ -510,7 +549,6 @@ const form = reactive({
 const categories = ref([]);
 const brands = ref([]);
 const units = ref([]);
-const warehouses = ref([]);
 
 // Table columns definition
 const columns = [
@@ -528,7 +566,6 @@ const getStockPercentage = (row) => {
   return (row.stock_quantity / (row.alert_quantity * 2)) * 100;
 };
 
-// Handle table data loaded
 const onTableDataLoaded = (data) => {
   allProducts.value = data;
   totalProducts.value = data.length;
@@ -536,23 +573,40 @@ const onTableDataLoaded = (data) => {
   totalValue.value = data.reduce((sum, p) => sum + (p.selling_price * p.stock_quantity), 0);
 };
 
-// Fetch required data on mount
-onMounted(async () => {
+// Fetch warehouses
+const fetchWarehouses = async () => {
   try {
-    // Use the new optimized endpoint for form data
+    const response = await api.get('/warehouses');
+    // Adjust based on your API response structure (pagination or direct array)
+    warehouses.value = response.data.data || response.data;
+  } catch (error) {
+    console.error("Error fetching warehouses:", error);
+  }
+};
+
+// Fetch other dropdown data (categories, brands, units)
+const fetchFormData = async () => {
+  try {
     const formDataResponse = await api.get('/products/form-data');
     const formData = formDataResponse.data;
-    
     categories.value = formData.categories;
     brands.value = formData.brands;
     units.value = formData.units;
-    warehouses.value = formData.warehouses;
+    // Optionally, if warehouses are also returned from form-data, merge them
+    if (formData.warehouses && formData.warehouses.length) {
+      warehouses.value = formData.warehouses;
+    }
   } catch (error) {
     console.error("Dropdown load failed:", error);
   }
+};
+
+// Watch warehouse filter – refresh table when changed
+watch(selectedWarehouse, () => {
+  tableKey.value += 1;
 });
 
-// Reset form to default values
+// Reset form
 const resetForm = () => {
   form.name = '';
   form.category_id = '';
@@ -568,8 +622,6 @@ const resetForm = () => {
   form.image = null;
   form.status = true;
   editingId.value = null;
-
-   // Reset preview
   imagePreview.value = null;
   existingImagePath.value = null;
   if (imageInput.value) {
@@ -577,24 +629,22 @@ const resetForm = () => {
   }
 };
 
-// Open modal for creating new product
+// Open create modal
 const openCreateModal = () => {
   isEditing.value = false;
   resetForm();
   showModal.value = true;
 };
 
-// Open modal for editing existing product
+// Edit product
 const editProduct = (product) => {
   isEditing.value = true;
   editingId.value = product.id;
-  
-  // Populate form with product data
   form.name = product.name;
   form.category_id = product.category_id;
   form.brand_id = product.brand_id || '';
   form.unit_id = product.unit_id;
-  form.warehouse_id = product.warehouse_id;
+  form.warehouse_id = product.warehouse_id || '';
   form.sku = product.sku;
   form.barcode = product.barcode || '';
   form.cost_price = product.cost_price;
@@ -602,8 +652,6 @@ const editProduct = (product) => {
   form.stock_quantity = product.stock_quantity;
   form.alert_quantity = product.alert_quantity;
   form.status = product.status;
-
-  // Set image preview for existing image
   if (product.image) {
     existingImagePath.value = product.image;
     imagePreview.value = getImageUrl(product.image);
@@ -611,13 +659,10 @@ const editProduct = (product) => {
     existingImagePath.value = null;
     imagePreview.value = null;
   }
-  
-  // Reset the file input
   form.image = null;
   if (imageInput.value) {
     imageInput.value.value = '';
   }
-  
   showModal.value = true;
 };
 
@@ -631,43 +676,32 @@ const closeModal = () => {
 const handleImageUpload = (event) => {
   const file = event.target.files[0];
   if (file) {
-    // Check file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
       alert('Image size must be less than 2MB');
       event.target.value = '';
       return;
     }
-    
-    // Check file type
     if (!file.type.match(/image\/(jpeg|png|jpg|gif)/)) {
       alert('Please upload a valid image file (JPEG, PNG, JPG, or GIF)');
       event.target.value = '';
       return;
     }
-    
     form.image = file;
-    
-    // Create preview
     const reader = new FileReader();
     reader.onload = (e) => {
       imagePreview.value = e.target.result;
     };
     reader.readAsDataURL(file);
-    
-    // Clear existing image path since we're using a new image
     existingImagePath.value = null;
   } else {
     form.image = null;
   }
 };
 
-
-
-// Helper function to get full image URL
+// Get full image URL
 const getImageUrl = (imagePath) => {
   if (!imagePath) return '';
   if (imagePath.startsWith('http')) return imagePath;
-  
   const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
   return `${baseUrl}/storage/${imagePath}`;
 };
@@ -687,8 +721,6 @@ const saveProduct = async () => {
   isSubmitting.value = true;
   try {
     const formData = new FormData();
-    
-    // Handle each form field carefully
     if (form.name) formData.append('name', form.name);
     if (form.category_id) formData.append('category_id', form.category_id);
     if (form.brand_id) formData.append('brand_id', form.brand_id);
@@ -699,46 +731,31 @@ const saveProduct = async () => {
     if (form.selling_price !== '' && form.selling_price !== null) formData.append('selling_price', form.selling_price);
     if (form.alert_quantity !== '' && form.alert_quantity !== null) formData.append('alert_quantity', form.alert_quantity);
     if (form.stock_quantity !== '' && form.stock_quantity !== null) formData.append('stock_quantity', form.stock_quantity);
-    
-    // Handle status - convert to 0/1
     formData.append('status', form.status ? '1' : '0');
-    
-    // Handle warehouse_id only for new products
     if (!isEditing.value && form.warehouse_id) {
       formData.append('warehouse_id', form.warehouse_id);
     }
-    
-    // Handle image - ONLY if it's an actual File object (new upload)
     if (form.image instanceof File) {
       formData.append('image', form.image);
     }
     
     let response;
     if (isEditing.value) {
-      // For PUT requests with file upload, use POST with _method=PUT
       formData.append('_method', 'PUT');
       response = await api.post(`/products/${editingId.value}`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
     } else {
       response = await api.post('/products', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
     }
     
     showModal.value = false;
     alert("Product saved successfully!");
-    // Refresh the table
     tableKey.value += 1;
-    
   } catch (error) {
     console.error("Save failed:", error.response?.data);
-    
-    // Show specific validation errors
     if (error.response?.data?.errors) {
       const errors = error.response.data.errors;
       const errorMessages = [];
@@ -756,7 +773,7 @@ const saveProduct = async () => {
   }
 };
 
-// Confirm delete
+// Delete product
 const confirmDelete = async (id) => {
   if (confirm('Are you sure you want to delete this product? This action cannot be undone.')) {
     try {
@@ -765,7 +782,6 @@ const confirmDelete = async (id) => {
       alert('Product deleted successfully!');
     } catch (error) {
       console.error('Error deleting product:', error);
-      
       if (error.response?.status === 422) {
         alert(error.response.data.message || 'Cannot delete product with transaction history.');
       } else {
@@ -774,6 +790,12 @@ const confirmDelete = async (id) => {
     }
   }
 };
+
+// Lifecycle
+onMounted(() => {
+  fetchWarehouses();
+  fetchFormData();
+});
 </script>
 
 <style scoped>

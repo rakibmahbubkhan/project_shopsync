@@ -283,6 +283,18 @@
             <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm font-medium">Stock Transfer</span>
             <span v-if="isCollapsed" class="tooltip">Stock Transfer</span>
           </router-link>
+
+          <router-link 
+            :to="'/products/damaged'" 
+            class="nav-item group" 
+            active-class="active" 
+            :class="{ 'justify-center': isCollapsed }"
+          >
+            <span class="icon text-lg">🚚</span>
+            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm font-medium">Damage Stock</span>
+            <span v-if="isCollapsed" class="tooltip">Damage Stock</span>
+          </router-link>
+
         </div>
 
         <!-- Administration Section (Admin Only) -->

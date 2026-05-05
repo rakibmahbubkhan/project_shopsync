@@ -17,6 +17,7 @@ const routes = [
 
       // Products & Inventory
       { path: 'products', name: 'products', component: () => import('@/views/Products/ProductList.vue') },
+      { path: '/products/damaged', name: 'DamagedProducts', component: () => import('@/views/Products/DamagedProductList.vue'), meta: { requiresAuth: true } },
       { path: 'categories', name: 'categories', component: () => import('@/views/inventory/CategoryList.vue')},
       { path: 'brands', name: 'brands', component: () => import('@/views/inventory/BrandList.vue')},
       { path: 'units', name: 'units', component: () => import('@/views/inventory/UnitList.vue')},
