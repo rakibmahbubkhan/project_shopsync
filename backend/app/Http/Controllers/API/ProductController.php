@@ -363,35 +363,32 @@ class ProductController extends Controller
         return response()->json(['message' => 'Stock updated successfully']);
     }
 
-    // app/Http/Controllers/API/ProductController.php (add these methods)
-
     /**
-     * List damaged products (with optional warehouse filter)
+     * List damaged products with warehouse filter, search, and pagination.
      */
     public function damagedProducts(Request $request)
     {
-        $query = DamagedProduct::with(['product:id,name,sku', 'warehouse:id,name'])
-            ->select('damaged_products.*'); // ensure correct table
-        
+        $query = DamagedProduct::with(['product:id,name,sku', 'warehouse:id,name']);
+
         if ($request->filled('warehouse_id')) {
             $query->where('warehouse_id', $request->warehouse_id);
         }
-        
-        // optional search by product name
+
         if ($request->filled('search')) {
-            $query->whereHas('product', function($q) use ($request) {
-                $q->where('name', 'like', "%{$request->search}%")->orWhere('sku', 'like', "%{$request->search}%");
+            $query->whereHas('product', function ($q) use ($request) {
+                $q->where('name', 'like', "%{$request->search}%")
+                ->orWhere('sku', 'like', "%{$request->search}%");
             });
         }
-        
+
         $perPage = $request->get('per_page', 10);
         $damaged = $query->orderBy('report_date', 'desc')->paginate($perPage);
-        
+
         return response()->json($damaged);
     }
 
     /**
-     * Store a new damaged product record
+     * Store a new damaged product record.
      */
     public function storeDamaged(Request $request)
     {
@@ -402,25 +399,34 @@ class ProductController extends Controller
             'report_date'  => 'required|date',
             'notes'        => 'nullable|string|max:500',
         ]);
-        
+
+        // Optional: check if enough stock exists before recording damage
+        $stock = ProductStock::where('product_id', $validated['product_id'])
+                            ->where('warehouse_id', $validated['warehouse_id'])
+                            ->first();
+
+        if (!$stock || $stock->quantity < $validated['quantity']) {
+            return response()->json([
+                'message' => 'Insufficient stock in the selected warehouse to mark as damaged.'
+            ], 422);
+        }
+
         $damaged = DamagedProduct::create($validated);
-        
-        // Optional: Automatically reduce stock in product_stocks table
         $this->reduceStockForDamaged($damaged);
-        
+
         return response()->json([
-            'message' => 'Damaged product recorded successfully',
+            'message' => 'Damaged product recorded successfully.',
             'data'    => $damaged->load(['product', 'warehouse'])
         ], 201);
     }
 
     /**
-     * Update damaged product record
+     * Update a damaged product record.
      */
     public function updateDamaged(Request $request, $id)
     {
         $damaged = DamagedProduct::findOrFail($id);
-        
+
         $validated = $request->validate([
             'product_id'   => 'sometimes|exists:products,id',
             'warehouse_id' => 'sometimes|exists:warehouses,id',
@@ -428,68 +434,59 @@ class ProductController extends Controller
             'report_date'  => 'sometimes|date',
             'notes'        => 'nullable|string|max:500',
         ]);
-        
-        // Before updating, adjust stock difference if quantity changes
+
         $oldQty = $damaged->quantity;
         $damaged->update($validated);
-        
+
         if (isset($validated['quantity']) && $validated['quantity'] != $oldQty) {
             $this->adjustStockForDamagedUpdate($damaged, $oldQty);
         }
-        
+
         return response()->json([
-            'message' => 'Damaged record updated',
+            'message' => 'Damaged record updated successfully.',
             'data'    => $damaged->load(['product', 'warehouse'])
         ]);
     }
 
     /**
-     * Delete damaged product record
+     * Delete a damaged product record and restore stock.
      */
     public function destroyDamaged($id)
     {
         $damaged = DamagedProduct::findOrFail($id);
-        
-        // Restore stock before deletion
         $this->restoreStockFromDamaged($damaged);
-        
         $damaged->delete();
-        
-        return response()->json(['message' => 'Damaged record deleted successfully']);
+
+        return response()->json(['message' => 'Damaged record deleted successfully.']);
     }
 
-    // --- Helper methods for stock management (optional) ---
+    // --- Stock Helper Methods (already in your controller) ---
     private function reduceStockForDamaged(DamagedProduct $damaged)
     {
         $stock = ProductStock::where('product_id', $damaged->product_id)
-            ->where('warehouse_id', $damaged->warehouse_id)
-            ->first();
-        
+                            ->where('warehouse_id', $damaged->warehouse_id)
+                            ->first();
         if ($stock) {
-            $newQty = max(0, $stock->quantity - $damaged->quantity);
-            $stock->update(['quantity' => $newQty]);
+            $stock->decrement('quantity', $damaged->quantity);
         }
     }
 
     private function adjustStockForDamagedUpdate(DamagedProduct $damaged, $oldQty)
     {
         $stock = ProductStock::where('product_id', $damaged->product_id)
-            ->where('warehouse_id', $damaged->warehouse_id)
-            ->first();
-        
+                            ->where('warehouse_id', $damaged->warehouse_id)
+                            ->first();
         if ($stock) {
-            $difference = $oldQty - $damaged->quantity; // positive means we give back stock
-            $newQty = max(0, $stock->quantity + $difference);
-            $stock->update(['quantity' => $newQty]);
+            $difference = $oldQty - $damaged->quantity; // positive = add back, negative = remove more
+            $stock->increment('quantity', $difference);
         }
     }
 
     private function restoreStockFromDamaged(DamagedProduct $damaged)
     {
         $stock = ProductStock::where('product_id', $damaged->product_id)
-            ->where('warehouse_id', $damaged->warehouse_id)
-            ->first();
-        
+                            ->where('warehouse_id', $damaged->warehouse_id)
+                            ->first();
         if ($stock) {
             $stock->increment('quantity', $damaged->quantity);
         }

@@ -5,6 +5,7 @@ use App\Http\Middleware\CheckPermission;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -20,6 +21,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => CheckPermission::class,
 
         ]);
+
+        $middleware->redirectGuestsTo(fn (Request $request) => $request->expectsJson() ? null : route('login'));
         
         // You can also register global middleware here
         // $middleware->append(SomeGlobalMiddleware::class);
