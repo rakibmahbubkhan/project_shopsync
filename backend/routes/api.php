@@ -119,6 +119,8 @@ use App\Http\Controllers\API\UnitController;
 use App\Http\Controllers\API\TaxController;
 use App\Http\Controllers\API\VariantController;
 use App\Http\Controllers\API\PaymentController;
+use App\Http\Controllers\API\ExpenseCategoryController;
+use App\Http\Controllers\API\ExpenseController;
 
 // Dummy login route to prevent redirect exceptions for API auth
 Route::any('/login', function () {
@@ -235,6 +237,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // Warehouses
     Route::get('warehouses/dropdown', [WarehouseController::class, 'getDropdown']);
     Route::apiResource('warehouses', WarehouseController::class);
+
+
+    // Expenses Module Routes
+    Route::apiResource('expense-categories', ExpenseCategoryController::class);
+    Route::apiResource('expenses', ExpenseController::class);
 
     // POS Init Data
     Route::get('/pos/init', function () {
