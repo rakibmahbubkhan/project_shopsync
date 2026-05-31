@@ -1,414 +1,461 @@
 <template>
-  <aside 
-    class="h-screen fixed left-0 top-0 z-50 flex flex-col transition-all duration-300 ease-in-out"
-    :class="[
-      isCollapsed ? 'w-[72px]' : 'w-80',
-      'bg-gradient-to-b from-slate-900 via-slate-800 to-indigo-900'
-    ]"
+  <!-- Mobile Floating Menu Button (visible only on mobile when sidebar is closed) -->
+  <button
+    v-if="isMobile && !mobileMenuOpen"
+    @click="mobileMenuOpen = true"
+    class="sidebar__mobile-menu-btn"
+    aria-label="Open menu"
   >
-    <!-- Animated Background Elements -->
-    <div class="absolute inset-0 overflow-hidden pointer-events-none">
-      <div class="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-full blur-3xl animate-pulse-slow"></div>
-      <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-full blur-3xl animate-pulse-slower"></div>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+
+  <!-- Sidebar Container -->
+  <aside
+    class="sidebar"
+    :class="{
+      'sidebar--desktop-collapsed': !isMobile && isCollapsed,
+      'sidebar--desktop-expanded': !isMobile && !isCollapsed,
+      'sidebar--mobile-open': isMobile && mobileMenuOpen,
+      'sidebar--mobile-closed': isMobile && !mobileMenuOpen
+    }"
+  >
+    <!-- Animated Orb Background (only desktop subtle) -->
+    <div class="sidebar__bg">
+      <div class="sidebar__orb sidebar__orb--1"></div>
+      <div class="sidebar__orb sidebar__orb--2"></div>
+      <div class="sidebar__orb sidebar__orb--3"></div>
     </div>
-    
-    <!-- Main content with glass effect -->
-    <div class="relative flex flex-col h-full backdrop-blur-xl bg-white/5">
-      
-      <!-- Decorative top gradient line -->
-      <div class="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent"></div>
-      
-      <!-- Logo Section -->
-      <div class="relative p-4 border-b border-white/10 flex items-center justify-between min-h-[72px]">
-        <!-- Logo -->
-        <div class="flex items-center gap-3 overflow-hidden">
-          <div class="relative flex-shrink-0 group">
-            <div class="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl blur-lg opacity-50 group-hover:opacity-75 transition-opacity"></div>
-            <div class="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl animate-ping-slow opacity-20"></div>
-            <div class="relative w-10 h-10 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 text-white rounded-xl flex items-center justify-center font-black text-lg shadow-2xl">
-              SS
-            </div>
+
+    <!-- Glass Panel / Main Content -->
+    <div class="sidebar__panel">
+      <!-- Header with Logo & Close (Mobile) / Toggle (Desktop) -->
+      <div class="sidebar__header">
+        <div class="sidebar__logo-wrapper">
+          <div class="sidebar__logo-icon">
+            <span class="sidebar__logo-text">SS</span>
           </div>
-          <div 
-            class="transition-all duration-300 overflow-hidden whitespace-nowrap"
-            :class="isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'"
-          >
-            <h2 class="font-bold text-xl">
-              <span class="bg-gradient-to-r from-white via-blue-100 to-purple-100 bg-clip-text text-transparent">ShopSync</span>
+          <transition name="fade-slide">
+            <h2 v-if="!isMobile && !isCollapsed" class="sidebar__logo-title">
+              <span>ShopSync</span>
             </h2>
-          </div>
+          </transition>
         </div>
 
-        <!-- Collapse Toggle Button -->
-        <button 
+        <!-- Desktop toggle button -->
+        <button
+          v-if="!isMobile"
           @click="toggleSidebar"
-          class="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-slate-800/90 backdrop-blur-xl rounded-full border border-white/20 flex items-center justify-center hover:bg-slate-700 transition-all group shadow-lg hover:scale-110 hover:border-white/40 z-10"
-          :class="{ 'rotate-180': !isCollapsed }"
+          class="sidebar__toggle"
+          :class="{ 'sidebar__toggle--rotated': !isCollapsed }"
         >
-          <svg class="w-3 h-3 text-white/70 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path>
+          <svg class="sidebar__toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 19l-7-7 7-7m8 14l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+
+        <!-- Mobile close button -->
+        <button
+          v-if="isMobile"
+          @click="mobileMenuOpen = false"
+          class="sidebar__mobile-close"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
       </div>
-      
-      <!-- Navigation -->
-      <nav class="flex-1 mt-4 px-3 space-y-1 overflow-y-auto custom-scrollbar">
+
+      <!-- Navigation (same content, but class adjustments) -->
+      <nav class="sidebar__nav">
         <!-- Main Menu Section -->
-        <div v-if="!isCollapsed" class="px-2 mb-2">
-          <p class="text-[10px] font-semibold text-white/40 uppercase tracking-wider">Main Menu</p>
+        <div v-if="!isMobile && !isCollapsed" class="sidebar__section-title">
+          <span>Main Menu</span>
         </div>
-        
+
         <!-- Dashboard -->
-        <router-link 
-          :to="'/'" 
-          class="nav-item group" 
-          active-class="active" 
-          :class="{ 'justify-center': isCollapsed }"
+        <router-link
+          to="/"
+          class="sidebar__link"
+          active-class="sidebar__link--active"
+          :class="{ 'sidebar__link--collapsed': !isMobile && isCollapsed }"
+          @click="closeMobileIfNeeded"
         >
-          <span class="icon text-lg">📊</span>
-          <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm font-medium">Dashboard</span>
-          <span v-if="!isCollapsed" class="badge-modern from-blue-500 to-indigo-500">New</span>
-          <span v-if="isCollapsed" class="tooltip">Dashboard</span>
+          <div class="sidebar__icon">📊</div>
+          <span v-if="!isMobile && !isCollapsed" class="sidebar__label">Dashboard</span>
+          <span v-if="!isMobile && !isCollapsed" class="sidebar__badge sidebar__badge--primary">New</span>
+          <span v-if="!isMobile && isCollapsed" class="sidebar__tooltip">Dashboard</span>
         </router-link>
 
         <!-- POS System -->
-        <router-link 
-          :to="'/pos'" 
-          class="nav-item group" 
-          active-class="active" 
-          :class="{ 'justify-center': isCollapsed }"
+        <router-link
+          to="/pos"
+          class="sidebar__link"
+          active-class="sidebar__link--active"
+          :class="{ 'sidebar__link--collapsed': !isMobile && isCollapsed }"
+          @click="closeMobileIfNeeded"
         >
-          <span class="icon text-lg">🖥️</span>
-          <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm font-medium">POS System</span>
-          <span v-if="!isCollapsed" class="badge-modern from-green-500 to-emerald-500">Live</span>
-          <span v-if="isCollapsed" class="tooltip">POS System</span>
+          <div class="sidebar__icon">🖥️</div>
+          <span v-if="!isMobile && !isCollapsed" class="sidebar__label">POS System</span>
+          <span v-if="!isMobile && !isCollapsed" class="sidebar__badge sidebar__badge--success">Live</span>
+          <span v-if="!isMobile && isCollapsed" class="sidebar__tooltip">POS System</span>
         </router-link>
 
-        <!-- Inventory with Collapsible Submenu -->
-        <div class="space-y-1">
-          <button 
+        <!-- Inventory Section -->
+        <div class="sidebar__group">
+          <button
             @click="toggleInventoryMenu"
-            class="nav-item group w-full flex items-center" 
-            :class="{ 
-              'justify-center': isCollapsed, 
-              'bg-white/10 text-white': isInventoryOpen 
+            class="sidebar__group-btn"
+            :class="{
+              'sidebar__group-btn--active': isInventoryOpen,
+              'sidebar__group-btn--collapsed': !isMobile && isCollapsed
             }"
           >
-            <span class="icon text-lg">🔧</span>
-            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm text-left">Inventory</span>
-            <span v-if="!isCollapsed && !isInventoryOpen" class="badge-modern from-orange-500 to-red-500">6</span>
-            <svg 
-              v-if="!isCollapsed" 
-              class="w-4 h-4 transition-transform duration-300" 
-              :class="{ 'rotate-180': isInventoryOpen }" 
-              fill="none" stroke="currentColor" viewBox="0 0 24 24"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            <div class="sidebar__icon">🔧</div>
+            <span v-if="!isMobile && !isCollapsed" class="sidebar__label">Inventory</span>
+            <span v-if="!isMobile && !isCollapsed && !isInventoryOpen" class="sidebar__badge sidebar__badge--warning">6</span>
+            <svg v-if="!isMobile && !isCollapsed" class="sidebar__chevron" :class="{ 'sidebar__chevron--open': isInventoryOpen }" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M19 9l-7 7-7-7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            <span v-if="isCollapsed" class="tooltip">Inventory</span>
+            <span v-if="!isMobile && isCollapsed" class="sidebar__tooltip">Inventory</span>
           </button>
 
-          <!-- Submenu Items -->
-          <div v-if="!isCollapsed && isInventoryOpen" class="pl-10 space-y-1 mt-1">
-            <router-link to="/products" class="sub-nav-item" active-class="active-sub">
-              All Products
-            </router-link>
-            <router-link to="/categories" class="sub-nav-item" active-class="active-sub">
-              Categories
-            </router-link>
-            <router-link to="/brands" class="sub-nav-item" active-class="active-sub">
-              Brands
-            </router-link>
-            <router-link to="/units" class="sub-nav-item" active-class="active-sub">
-              Units
-            </router-link>
-            <router-link to="/taxes" class="sub-nav-item" active-class="active-sub">
-              Taxes
-            </router-link>
-            <router-link to="/variants" class="sub-nav-item" active-class="active-sub">
-              Variants
-            </router-link>
+          <transition name="submenu">
+            <div v-if="!isMobile && !isCollapsed && isInventoryOpen" class="sidebar__submenu">
+              <router-link to="/products" class="sidebar__sub-link" @click="closeMobileIfNeeded">All Products</router-link>
+              <router-link to="/categories" class="sidebar__sub-link" @click="closeMobileIfNeeded">Categories</router-link>
+              <router-link to="/brands" class="sidebar__sub-link" @click="closeMobileIfNeeded">Brands</router-link>
+              <router-link to="/units" class="sidebar__sub-link" @click="closeMobileIfNeeded">Units</router-link>
+              <router-link to="/taxes" class="sidebar__sub-link" @click="closeMobileIfNeeded">Taxes</router-link>
+              <router-link to="/variants" class="sidebar__sub-link" @click="closeMobileIfNeeded">Variants</router-link>
+            </div>
+          </transition>
+          <!-- Mobile submenu (always expanded style) -->
+          <div v-if="isMobile && isInventoryOpen" class="sidebar__submenu sidebar__submenu--mobile">
+            <router-link to="/products" class="sidebar__sub-link" @click="closeMobileIfNeeded">All Products</router-link>
+            <router-link to="/categories" class="sidebar__sub-link" @click="closeMobileIfNeeded">Categories</router-link>
+            <router-link to="/brands" class="sidebar__sub-link" @click="closeMobileIfNeeded">Brands</router-link>
+            <router-link to="/units" class="sidebar__sub-link" @click="closeMobileIfNeeded">Units</router-link>
+            <router-link to="/taxes" class="sidebar__sub-link" @click="closeMobileIfNeeded">Taxes</router-link>
+            <router-link to="/variants" class="sidebar__sub-link" @click="closeMobileIfNeeded">Variants</router-link>
           </div>
         </div>
 
-        <!-- Customers with Collapsible Submenu -->
-        <div class="space-y-1">
-          <button 
+        <!-- Customers Section -->
+        <div class="sidebar__group">
+          <button
             @click="toggleCustomersMenu"
-            class="nav-item group w-full flex items-center" 
-            :class="{ 
-              'justify-center': isCollapsed, 
-              'bg-white/10 text-white': isCustomersOpen 
+            class="sidebar__group-btn"
+            :class="{
+              'sidebar__group-btn--active': isCustomersOpen,
+              'sidebar__group-btn--collapsed': !isMobile && isCollapsed
             }"
           >
-            <span class="icon text-lg">👥</span>
-            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm text-left">Customers</span>
-            <!-- Show badge with pending count if there are pending customers -->
-            <span v-if="!isCollapsed && pendingCount > 0" class="badge-modern from-red-500 to-orange-500">{{ pendingCount }}</span>
-            <svg 
-              v-if="!isCollapsed" 
-              class="w-4 h-4 transition-transform duration-300" 
-              :class="{ 'rotate-180': isCustomersOpen }" 
-              fill="none" stroke="currentColor" viewBox="0 0 24 24"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            <div class="sidebar__icon">👥</div>
+            <span v-if="!isMobile && !isCollapsed" class="sidebar__label">Customers</span>
+            <span v-if="!isMobile && !isCollapsed && pendingCount > 0" class="sidebar__badge sidebar__badge--danger">{{ pendingCount }}</span>
+            <svg v-if="!isMobile && !isCollapsed" class="sidebar__chevron" :class="{ 'sidebar__chevron--open': isCustomersOpen }" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M19 9l-7 7-7-7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            <span v-if="isCollapsed" class="tooltip">Customers</span>
+            <span v-if="!isMobile && isCollapsed" class="sidebar__tooltip">Customers</span>
           </button>
 
-          <!-- Customer Submenu Items -->
-          <div v-if="!isCollapsed && isCustomersOpen" class="pl-10 space-y-1 mt-1">
-            <router-link to="/customers" class="sub-nav-item" active-class="active-sub">
-              Customer List
-            </router-link>
-            <router-link to="/customers/pending" class="sub-nav-item" active-class="active-sub">
-              <div class="flex items-center justify-between">
+          <transition name="submenu">
+            <div v-if="!isMobile && !isCollapsed && isCustomersOpen" class="sidebar__submenu">
+              <router-link to="/customers" class="sidebar__sub-link" @click="closeMobileIfNeeded">Customer List</router-link>
+              <router-link to="/customers/pending" class="sidebar__sub-link" @click="closeMobileIfNeeded">
+                <div class="sidebar__sub-label">
+                  <span>Pending Payments</span>
+                  <span v-if="pendingCount > 0" class="sidebar__sub-badge">{{ pendingCount }}</span>
+                </div>
+              </router-link>
+            </div>
+          </transition>
+          <div v-if="isMobile && isCustomersOpen" class="sidebar__submenu sidebar__submenu--mobile">
+            <router-link to="/customers" class="sidebar__sub-link" @click="closeMobileIfNeeded">Customer List</router-link>
+            <router-link to="/customers/pending" class="sidebar__sub-link" @click="closeMobileIfNeeded">
+              <div class="sidebar__sub-label">
                 <span>Pending Payments</span>
-                <span v-if="pendingCount > 0" class="px-1.5 py-0.5 bg-red-500/20 text-red-400 rounded-full text-[10px] font-bold">
-                  {{ pendingCount }}
-                </span>
+                <span v-if="pendingCount > 0" class="sidebar__sub-badge">{{ pendingCount }}</span>
               </div>
             </router-link>
           </div>
         </div>
 
         <!-- Operations Section -->
-        <div class="mt-6">
-          <div v-if="!isCollapsed" class="px-2 mb-2">
-            <p class="text-[10px] font-semibold text-white/40 uppercase tracking-wider">Operations</p>
-          </div>
-          
-          <!-- Sales with Collapsible Submenu -->
-          <div class="space-y-1">
-            <button 
-              @click="toggleSalesMenu"
-              class="nav-item group w-full flex items-center" 
-              :class="{ 
-                'justify-center': isCollapsed, 
-                'bg-white/10 text-white': isSalesOpen 
-              }"
-            >
-              <span class="icon text-lg">💰</span>
-              <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm text-left">Sales</span>
-              <svg 
-                v-if="!isCollapsed" 
-                class="w-4 h-4 transition-transform duration-300" 
-                :class="{ 'rotate-180': isSalesOpen }" 
-                fill="none" stroke="currentColor" viewBox="0 0 24 24"
-              >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-              </svg>
-              <span v-if="isCollapsed" class="tooltip">Sales</span>
-            </button>
+        <div v-if="!isMobile && !isCollapsed" class="sidebar__section-title sidebar__section-title--mt">
+          <span>Operations</span>
+        </div>
 
-            <!-- Sales Submenu Items -->
-            <div v-if="!isCollapsed && isSalesOpen" class="pl-10 space-y-1 mt-1">
-              <router-link to="/sales" class="sub-nav-item" active-class="active-sub">
-                Sales History
-              </router-link>
-              <router-link to="/sales/returns" class="sub-nav-item" active-class="active-sub">
-                <div class="flex items-center justify-between">
-                  <span>Sales Returns</span>
-                </div>
-              </router-link>
+        <!-- Sales Section -->
+        <div class="sidebar__group">
+          <button
+            @click="toggleSalesMenu"
+            class="sidebar__group-btn"
+            :class="{
+              'sidebar__group-btn--active': isSalesOpen,
+              'sidebar__group-btn--collapsed': !isMobile && isCollapsed
+            }"
+          >
+            <div class="sidebar__icon">💰</div>
+            <span v-if="!isMobile && !isCollapsed" class="sidebar__label">Sales</span>
+            <svg v-if="!isMobile && !isCollapsed" class="sidebar__chevron" :class="{ 'sidebar__chevron--open': isSalesOpen }" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M19 9l-7 7-7-7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span v-if="!isMobile && isCollapsed" class="sidebar__tooltip">Sales</span>
+          </button>
+
+          <transition name="submenu">
+            <div v-if="!isMobile && !isCollapsed && isSalesOpen" class="sidebar__submenu">
+              <router-link to="/sales" class="sidebar__sub-link" @click="closeMobileIfNeeded">Sales History</router-link>
+              <router-link to="/sales/returns" class="sidebar__sub-link" @click="closeMobileIfNeeded">Sales Returns</router-link>
             </div>
+          </transition>
+          <div v-if="isMobile && isSalesOpen" class="sidebar__submenu sidebar__submenu--mobile">
+            <router-link to="/sales" class="sidebar__sub-link" @click="closeMobileIfNeeded">Sales History</router-link>
+            <router-link to="/sales/returns" class="sidebar__sub-link" @click="closeMobileIfNeeded">Sales Returns</router-link>
           </div>
+        </div>
 
-          <!-- Purchases -->
-          <div class="space-y-1">
-            <button 
-              @click="togglePurchasesMenu"
-              class="nav-item group w-full flex items-center" 
-              :class="{ 
-                'justify-center': isCollapsed, 
-                'bg-white/10 text-white': isPurchasesOpen 
-              }"
-            >
-              <span class="icon text-lg">📋</span>
-              <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm text-left">Purchases</span>
-              <svg 
-                v-if="!isCollapsed" 
-                class="w-4 h-4 transition-transform duration-300" 
-                :class="{ 'rotate-180': isPurchasesOpen }" 
-                fill="none" stroke="currentColor" viewBox="0 0 24 24"
-              >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-              </svg>
-              <span v-if="isCollapsed" class="tooltip">Purchases</span>
-            </button>
+        <!-- Purchases Section -->
+        <div class="sidebar__group">
+          <button
+            @click="togglePurchasesMenu"
+            class="sidebar__group-btn"
+            :class="{
+              'sidebar__group-btn--active': isPurchasesOpen,
+              'sidebar__group-btn--collapsed': !isMobile && isCollapsed
+            }"
+          >
+            <div class="sidebar__icon">📋</div>
+            <span v-if="!isMobile && !isCollapsed" class="sidebar__label">Purchases</span>
+            <svg v-if="!isMobile && !isCollapsed" class="sidebar__chevron" :class="{ 'sidebar__chevron--open': isPurchasesOpen }" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M19 9l-7 7-7-7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span v-if="!isMobile && isCollapsed" class="sidebar__tooltip">Purchases</span>
+          </button>
 
-            <!-- Purchases Submenu Items -->
-            <div v-if="!isCollapsed && isPurchasesOpen" class="pl-10 space-y-1 mt-1">
-              <router-link to="/purchases" class="sub-nav-item" active-class="active-sub">
-                Purchase List
-              </router-link>
-              <router-link to="/purchases/create" class="sub-nav-item" active-class="active-sub">
-                New Purchase
-              </router-link>
-              <router-link to="/purchases/returns" class="sub-nav-item" active-class="active-sub">
-                Purchase Returns
-              </router-link>
+          <transition name="submenu">
+            <div v-if="!isMobile && !isCollapsed && isPurchasesOpen" class="sidebar__submenu">
+              <router-link to="/purchases" class="sidebar__sub-link" @click="closeMobileIfNeeded">Purchase List</router-link>
+              <router-link to="/purchases/create" class="sidebar__sub-link" @click="closeMobileIfNeeded">New Purchase</router-link>
+              <router-link to="/purchases/returns" class="sidebar__sub-link" @click="closeMobileIfNeeded">Purchase Returns</router-link>
             </div>
+          </transition>
+          <div v-if="isMobile && isPurchasesOpen" class="sidebar__submenu sidebar__submenu--mobile">
+            <router-link to="/purchases" class="sidebar__sub-link" @click="closeMobileIfNeeded">Purchase List</router-link>
+            <router-link to="/purchases/create" class="sidebar__sub-link" @click="closeMobileIfNeeded">New Purchase</router-link>
+            <router-link to="/purchases/returns" class="sidebar__sub-link" @click="closeMobileIfNeeded">Purchase Returns</router-link>
           </div>
+        </div>
 
-          <router-link 
-            :to="'/suppliers'" 
-            class="nav-item group" 
-            active-class="active" 
-            :class="{ 'justify-center': isCollapsed }"
+        <!-- Standard Links -->
+        <router-link
+          to="/suppliers"
+          class="sidebar__link"
+          active-class="sidebar__link--active"
+          :class="{ 'sidebar__link--collapsed': !isMobile && isCollapsed }"
+          @click="closeMobileIfNeeded"
+        >
+          <div class="sidebar__icon">🏭</div>
+          <span v-if="!isMobile && !isCollapsed" class="sidebar__label">Suppliers</span>
+          <span v-if="!isMobile && isCollapsed" class="sidebar__tooltip">Suppliers</span>
+        </router-link>
+
+        <router-link
+          to="/warehouses"
+          class="sidebar__link"
+          active-class="sidebar__link--active"
+          :class="{ 'sidebar__link--collapsed': !isMobile && isCollapsed }"
+          @click="closeMobileIfNeeded"
+        >
+          <div class="sidebar__icon">🏪</div>
+          <span v-if="!isMobile && !isCollapsed" class="sidebar__label">Warehouses</span>
+          <span v-if="!isMobile && isCollapsed" class="sidebar__tooltip">Warehouses</span>
+        </router-link>
+
+        <router-link
+          to="/inventory/transfer"
+          class="sidebar__link"
+          active-class="sidebar__link--active"
+          :class="{ 'sidebar__link--collapsed': !isMobile && isCollapsed }"
+          @click="closeMobileIfNeeded"
+        >
+          <div class="sidebar__icon">🚚</div>
+          <span v-if="!isMobile && !isCollapsed" class="sidebar__label">Stock Transfer</span>
+          <span v-if="!isMobile && isCollapsed" class="sidebar__tooltip">Stock Transfer</span>
+        </router-link>
+
+        <router-link
+          to="/products/damaged"
+          class="sidebar__link"
+          active-class="sidebar__link--active"
+          :class="{ 'sidebar__link--collapsed': !isMobile && isCollapsed }"
+          @click="closeMobileIfNeeded"
+        >
+          <div class="sidebar__icon">⚠️</div>
+          <span v-if="!isMobile && !isCollapsed" class="sidebar__label">Damage Stock</span>
+          <span v-if="!isMobile && isCollapsed" class="sidebar__tooltip">Damage Stock</span>
+        </router-link>
+
+        <!-- Expenses Section -->
+        <div class="sidebar__group">
+          <button
+            @click="toggleExpensesMenu"
+            class="sidebar__group-btn"
+            :class="{
+              'sidebar__group-btn--active': isExpensesOpen,
+              'sidebar__group-btn--collapsed': !isMobile && isCollapsed
+            }"
           >
-            <span class="icon text-lg">🏭</span>
-            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm font-medium">Suppliers</span>
-            <span v-if="isCollapsed" class="tooltip">Suppliers</span>
-          </router-link>
+            <div class="sidebar__icon">📉</div>
+            <span v-if="!isMobile && !isCollapsed" class="sidebar__label">Expenses</span>
+            <svg v-if="!isMobile && !isCollapsed" class="sidebar__chevron" :class="{ 'sidebar__chevron--open': isExpensesOpen }" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M19 9l-7 7-7-7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span v-if="!isMobile && isCollapsed" class="sidebar__tooltip">Expenses</span>
+          </button>
 
-          <router-link 
-            :to="'/warehouses'" 
-            class="nav-item group" 
-            active-class="active" 
-            :class="{ 'justify-center': isCollapsed }"
-          >
-            <span class="icon text-lg">🏪</span>
-            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm font-medium">Warehouses</span>
-            <span v-if="isCollapsed" class="tooltip">Warehouses</span>
-          </router-link>
-
-          <router-link 
-            :to="'/inventory/transfer'" 
-            class="nav-item group" 
-            active-class="active" 
-            :class="{ 'justify-center': isCollapsed }"
-          >
-            <span class="icon text-lg">🚚</span>
-            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm font-medium">Stock Transfer</span>
-            <span v-if="isCollapsed" class="tooltip">Stock Transfer</span>
-          </router-link>
-
-          <router-link 
-            :to="'/products/damaged'" 
-            class="nav-item group" 
-            active-class="active" 
-            :class="{ 'justify-center': isCollapsed }"
-          >
-            <span class="icon text-lg">🚚</span>
-            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm font-medium">Damage Stock</span>
-            <span v-if="isCollapsed" class="tooltip">Damage Stock</span>
-          </router-link>
-
+          <transition name="submenu">
+            <div v-if="!isMobile && !isCollapsed && isExpensesOpen" class="sidebar__submenu">
+              <router-link to="/expenses" class="sidebar__sub-link" @click="closeMobileIfNeeded">Expense List</router-link>
+              <router-link to="/expenses/create" class="sidebar__sub-link" @click="closeMobileIfNeeded">New Expense</router-link>
+              <router-link to="/expenses/categories" class="sidebar__sub-link" @click="closeMobileIfNeeded">Expense Categories</router-link>
+            </div>
+          </transition>
+          <div v-if="isMobile && isExpensesOpen" class="sidebar__submenu sidebar__submenu--mobile">
+            <router-link to="/expenses" class="sidebar__sub-link" @click="closeMobileIfNeeded">Expense List</router-link>
+            <router-link to="/expenses/create" class="sidebar__sub-link" @click="closeMobileIfNeeded">New Expense</router-link>
+            <router-link to="/expenses/categories" class="sidebar__sub-link" @click="closeMobileIfNeeded">Expense Categories</router-link>
+          </div>
         </div>
 
         <!-- Administration Section (Admin Only) -->
-        <div v-if="isAdmin" class="mt-6">
-          <div v-if="!isCollapsed" class="px-2 mb-2">
-            <p class="text-[10px] font-semibold text-white/40 uppercase tracking-wider">Administration</p>
+        <div v-if="isAdmin">
+          <div v-if="!isMobile && !isCollapsed" class="sidebar__section-title sidebar__section-title--mt">
+            <span>Administration</span>
           </div>
-          
-          <router-link 
-            v-for="item in adminItems" 
+          <router-link
+            v-for="item in adminItems"
             :key="item.to"
-            :to="item.to" 
-            class="nav-item group" 
-            active-class="active" 
-            :class="{ 'justify-center': isCollapsed }"
+            :to="item.to"
+            class="sidebar__link"
+            active-class="sidebar__link--active"
+            :class="{ 'sidebar__link--collapsed': !isMobile && isCollapsed }"
+            @click="closeMobileIfNeeded"
           >
-            <span class="icon text-lg">{{ item.icon }}</span>
-            <span v-if="!isCollapsed" class="flex-1 ml-3 text-sm font-medium">{{ item.label }}</span>
-            <span v-if="isCollapsed" class="tooltip">{{ item.label }}</span>
+            <div class="sidebar__icon">{{ item.icon }}</div>
+            <span v-if="!isMobile && !isCollapsed" class="sidebar__label">{{ item.label }}</span>
+            <span v-if="!isMobile && isCollapsed" class="sidebar__tooltip">{{ item.label }}</span>
           </router-link>
         </div>
       </nav>
-      
-      <!-- User Profile Section -->
-      <div class="relative mt-auto border-t border-white/10 bg-gradient-to-t from-black/20 to-transparent backdrop-blur-xl">
-        <!-- Collapsed Profile View -->
-        <div v-if="isCollapsed" class="py-4 flex justify-center">
-          <div class="relative group">
-            <div class="relative">
-              <div class="absolute inset-0 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl blur-md opacity-50 group-hover:opacity-75 transition-opacity"></div>
-              <div class="relative w-10 h-10 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 text-white rounded-xl flex items-center justify-center font-bold text-base shadow-2xl cursor-pointer">
-                {{ userInitial }}
-              </div>
-              <div class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-slate-900"></div>
-            </div>
-            
-            <div class="absolute left-full ml-3 bottom-0 w-48 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-50">
-              <div class="relative bg-slate-800/90 backdrop-blur-xl rounded-xl p-3 border border-white/20 shadow-2xl">
-                <div class="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-slate-800/90 rotate-45 border-l border-t border-white/20"></div>
-                <p class="text-sm font-bold text-white truncate">{{ userName }}</p>
-                <p class="text-xs text-white/60 mt-0.5">{{ userRole }}</p>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        <!-- Expanded Profile View -->
-        <div v-else class="p-3">
-          <div class="flex items-center gap-3">
-            <div class="relative group">
-              <div class="absolute inset-0 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl blur-md opacity-50 group-hover:opacity-75 transition-opacity"></div>
-              <div class="relative w-10 h-10 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 text-white rounded-xl flex items-center justify-center font-bold text-base shadow-2xl">
-                {{ userInitial }}
-              </div>
-              <div class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-slate-900"></div>
-            </div>
-            <div class="overflow-hidden flex-1">
-              <p class="text-sm font-bold text-white truncate">{{ userName }}</p>
-              <p class="text-xs text-white/60 font-medium flex items-center gap-1.5 mt-0.5">
-                <span class="relative flex h-1.5 w-1.5">
-                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                  <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
-                </span>
+      <!-- User Section -->
+      <div class="sidebar__footer">
+        <div class="sidebar__user">
+          <div class="sidebar__avatar">
+            <span class="sidebar__avatar-initial">{{ userInitial }}</span>
+            <span class="sidebar__status"></span>
+          </div>
+          <transition name="fade-slide">
+            <div v-if="!isMobile && !isCollapsed" class="sidebar__user-info">
+              <p class="sidebar__user-name">{{ userName }}</p>
+              <p class="sidebar__user-role">
+                <span class="sidebar__user-status-dot"></span>
                 {{ userRole }}
               </p>
             </div>
-          </div>
+          </transition>
         </div>
-        
-        <!-- Logout Button -->
-        <button 
-          @click="handleLogout" 
-          class="logout-btn group w-full flex items-center gap-2 py-3 px-4 transition-all duration-300"
-          :class="{ 'justify-center': isCollapsed }"
+
+        <button
+          @click="handleLogout"
+          class="sidebar__logout"
+          :class="{ 'sidebar__logout--collapsed': !isMobile && isCollapsed }"
         >
-          <span class="text-lg transform group-hover:scale-110 transition-transform">🚪</span>
-          <span v-if="!isCollapsed" class="text-sm font-medium">Logout</span>
-          <span v-if="!isCollapsed" class="ml-auto opacity-0 group-hover:opacity-100 group-hover:translate-x-0 -translate-x-1 transition-all">→</span>
-          <span v-if="isCollapsed" class="tooltip">Logout</span>
+          <div class="sidebar__icon">🚪</div>
+          <span v-if="!isMobile && !isCollapsed" class="sidebar__label">Logout</span>
+          <span v-if="!isMobile && isCollapsed" class="sidebar__tooltip">Logout</span>
         </button>
       </div>
     </div>
+
+    <!-- Mobile Backdrop -->
+    <transition name="fade">
+      <div v-if="isMobile && mobileMenuOpen" class="sidebar__mobile-backdrop" @click="mobileMenuOpen = false"></div>
+    </transition>
   </aside>
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import { useSidebarStore } from '@/stores/sidebarStore';
 import api from "@/api/axios";
 
 const emit = defineEmits(['toggle']);
-
 const router = useRouter();
 const auth = useAuthStore();
 const sidebarStore = useSidebarStore();
 
-// Sidebar collapse state
+// Sidebar state (desktop)
 const isCollapsed = computed(() => sidebarStore.isCollapsed);
 
-// Inventory submenu state
+// Menu states
 const isInventoryOpen = ref(false);
-
-// Customers submenu state
 const isCustomersOpen = ref(false);
-
-// Sales submenu state
 const isSalesOpen = ref(false);
-
-// Pending customers count
+const isPurchasesOpen = ref(false);
+const isExpensesOpen = ref(false);
 const pendingCount = ref(0);
 
-// Fetch pending customers count
+// Responsive
+const isMobile = ref(window.innerWidth < 768);
+const mobileMenuOpen = ref(false);
+
+// Close mobile sidebar on navigation
+const closeMobileIfNeeded = () => {
+  if (isMobile.value) {
+    mobileMenuOpen.value = false;
+  }
+};
+
+// Handle window resize
+const checkMobile = () => {
+  isMobile.value = window.innerWidth < 768;
+  if (!isMobile.value) {
+    mobileMenuOpen.value = false; // reset mobile overlay when switching to desktop
+  }
+};
+
+// Load saved states
+onMounted(() => {
+  sidebarStore.loadState();
+  window.addEventListener('resize', checkMobile);
+
+  const savedStates = {
+    inventoryMenuOpen: isInventoryOpen,
+    customersMenuOpen: isCustomersOpen,
+    salesMenuOpen: isSalesOpen,
+    purchasesMenuOpen: isPurchasesOpen,
+    expensesMenuOpen: isExpensesOpen
+  };
+  Object.entries(savedStates).forEach(([key, refState]) => {
+    const saved = localStorage.getItem(key);
+    if (saved !== null) refState.value = JSON.parse(saved);
+  });
+
+  fetchPendingCount();
+  const interval = setInterval(fetchPendingCount, 30000);
+  onUnmounted(() => {
+    clearInterval(interval);
+    window.removeEventListener('resize', checkMobile);
+  });
+});
+
 const fetchPendingCount = async () => {
   try {
     const response = await api.get('/customers/pending-payments/count');
@@ -419,76 +466,32 @@ const fetchPendingCount = async () => {
   }
 };
 
-// Load saved states from localStorage
-onMounted(() => {
-  sidebarStore.loadState();
-  
-  // Load inventory menu state
-  const savedInventoryState = localStorage.getItem('inventoryMenuOpen');
-  if (savedInventoryState !== null) {
-    isInventoryOpen.value = JSON.parse(savedInventoryState);
-  }
-  
-  // Load customers menu state
-  const savedCustomersState = localStorage.getItem('customersMenuOpen');
-  if (savedCustomersState !== null) {
-    isCustomersOpen.value = JSON.parse(savedCustomersState);
-  }
+// Toggle functions with persistence
+const toggleSidebar = () => sidebarStore.toggleSidebar();
+const toggleInventoryMenu = () => !isCollapsed.value && toggleWithStorage('inventoryMenuOpen', isInventoryOpen);
+const toggleCustomersMenu = () => !isCollapsed.value && toggleWithStorage('customersMenuOpen', isCustomersOpen);
+const toggleSalesMenu = () => !isCollapsed.value && toggleWithStorage('salesMenuOpen', isSalesOpen);
+const togglePurchasesMenu = () => !isCollapsed.value && toggleWithStorage('purchasesMenuOpen', isPurchasesOpen);
+const toggleExpensesMenu = () => !isCollapsed.value && toggleWithStorage('expensesMenuOpen', isExpensesOpen);
 
-  // Load sales menu state
-  const savedSalesState = localStorage.getItem('salesMenuOpen');
-  if (savedSalesState !== null) {
-    isSalesOpen.value = JSON.parse(savedSalesState);
+const toggleWithStorage = (key, stateRef) => {
+  stateRef.value = !stateRef.value;
+  localStorage.setItem(key, JSON.stringify(stateRef.value));
+};
+
+// Watch for collapse changes to close submenus when collapsed (desktop)
+watch(isCollapsed, (collapsed) => {
+  if (!isMobile.value && collapsed) {
+    isInventoryOpen.value = false;
+    isCustomersOpen.value = false;
+    isSalesOpen.value = false;
+    isPurchasesOpen.value = false;
+    isExpensesOpen.value = false;
   }
-  
-  // Fetch pending count
-  fetchPendingCount();
-  
-  // Refresh pending count every 30 seconds
-  const interval = setInterval(fetchPendingCount, 30000);
-  
-  // Cleanup interval on component unmount
-  return () => clearInterval(interval);
 });
 
-// Watch for changes and emit
-watch(isCollapsed, (newVal) => {
-  emit('toggle', !newVal);
-});
-
-// Toggle sidebar and save state
-const toggleSidebar = () => {
-  sidebarStore.toggleSidebar();
-};
-
-// Toggle inventory submenu
-const toggleInventoryMenu = () => {
-  if (!isCollapsed.value) {
-    isInventoryOpen.value = !isInventoryOpen.value;
-    localStorage.setItem('inventoryMenuOpen', JSON.stringify(isInventoryOpen.value));
-  }
-};
-
-// Toggle customers submenu
-const toggleCustomersMenu = () => {
-  if (!isCollapsed.value) {
-    isCustomersOpen.value = !isCustomersOpen.value;
-    localStorage.setItem('customersMenuOpen', JSON.stringify(isCustomersOpen.value));
-  }
-};
-
-// Toggle sales submenu
-const toggleSalesMenu = () => {
-  if (!isCollapsed.value) {
-    isSalesOpen.value = !isSalesOpen.value;
-    localStorage.setItem('salesMenuOpen', JSON.stringify(isSalesOpen.value));
-  }
-};
-
-const isAdmin = computed(() => {
-  return auth.user?.role_id === 1 || auth.user?.role === 'admin';
-});
-
+// Auth computed properties
+const isAdmin = computed(() => auth.user?.role_id === 1 || auth.user?.role === 'admin');
 const userName = computed(() => auth.user?.name || 'User');
 const userRole = computed(() => {
   if (auth.user?.role?.name) return auth.user.role.name;
@@ -497,7 +500,6 @@ const userRole = computed(() => {
 });
 const userInitial = computed(() => userName.value.charAt(0).toUpperCase());
 
-// Menu items configuration
 const adminItems = [
   { to: '/users', icon: '👥', label: 'Staff Management' },
   { to: '/financial', icon: '📈', label: 'Financial Reports' },
@@ -512,237 +514,619 @@ const handleLogout = async () => {
     console.error('Logout failed:', error);
   }
 };
-
-// In the state declarations
-const isPurchasesOpen = ref(false);
-
-// In the onMounted
-const savedPurchasesState = localStorage.getItem('purchasesMenuOpen');
-if (savedPurchasesState !== null) {
-  isPurchasesOpen.value = JSON.parse(savedPurchasesState);
-}
-
-// Toggle function
-const togglePurchasesMenu = () => {
-  if (!isCollapsed.value) {
-    isPurchasesOpen.value = !isPurchasesOpen.value;
-    localStorage.setItem('purchasesMenuOpen', JSON.stringify(isPurchasesOpen.value));
-  }
-};
 </script>
 
 <style scoped>
-/* Navigation item styling - Modern Glass Effect */
-.nav-item {
-  position: relative;
+/* ===== CSS Variables ===== */
+:root {
+  --sidebar-width-expanded: 280px;
+  --sidebar-width-collapsed: 80px;
+  --black-bg: #471b7e;
+  --glass-bg: rgba(18, 3, 83, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --accent-gradient: linear-gradient(135deg, #3b82f6, #8b5cf6, #d946ef);
+  --text-dim: rgb(255, 255, 255);
+  --text-bright: rgba(255, 255, 255, 0.95);
+  --transition-base: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ===== Base Sidebar ===== */
+.sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100vh;
+  z-index: 1000;
+  transition: var(--transition-base);
+}
+
+/* Desktop Expanded */
+.sidebar--desktop-expanded {
+  width: var(--sidebar-width-expanded);
+}
+
+/* Desktop Collapsed */
+.sidebar--desktop-collapsed {
+  width: var(--sidebar-width-collapsed);
+}
+
+/* Mobile Closed (hidden) */
+.sidebar--mobile-closed {
+  width: 0;
+  visibility: hidden;
+}
+
+/* Mobile Open (overlay) */
+.sidebar--mobile-open {
+  width: 280px;
+  visibility: visible;
+}
+
+/* Mobile Floating Menu Button */
+.sidebar__mobile-menu-btn {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 1001;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 12px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
-  padding: 0.625rem 0.75rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.6);
-  border-radius: 0.75rem;
-  transition: all 0.3s ease;
+  justify-content: center;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.sidebar__mobile-menu-btn:hover {
+  background: rgba(30, 30, 40, 0.9);
+  transform: scale(1.02);
+}
+
+/* Mobile Backdrop */
+.sidebar__mobile-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 999;
+}
+
+/* Animated Background Orbs (subtle) */
+.sidebar__bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.sidebar__orb {
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.25;
+  animation: float 20s infinite alternate;
+}
+
+.sidebar__orb--1 {
+  background: radial-gradient(circle, #3b82f6, transparent);
+  top: -100px;
+  right: -100px;
+  animation-duration: 25s;
+}
+
+.sidebar__orb--2 {
+  background: radial-gradient(circle, #8b5cf6, transparent);
+  bottom: -120px;
+  left: -80px;
+  animation-duration: 30s;
+}
+
+.sidebar__orb--3 {
+  background: radial-gradient(circle, #d946ef, transparent);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 400px;
+  height: 400px;
+  animation: pulseGlow 12s infinite alternate;
+  opacity: 0.15;
+}
+
+/* Glass Panel - Solid Black + subtle glass */
+.sidebar__panel {
+  position: relative;
+  height: 100%;
+  background: var(--black-bg);
+  background: linear-gradient(145deg, #040135 0%, #180133 100%);
+  border-right: 1px solid var(--glass-border);
+  display: flex;
+  flex-direction: column;
+  transition: var(--transition-base);
+  backdrop-filter: blur(2px);
+}
+
+/* Header Section */
+.sidebar__header {
+  position: relative;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--glass-border);
+  min-height: 72px;
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.sidebar__logo-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   overflow: hidden;
 }
 
-/* Hover effect with glass morphism */
-.nav-item::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to right, rgba(255,255,255,0), rgba(255,255,255,0.05), rgba(255,255,255,0));
-  opacity: 0;
-  transition: opacity 0.5s ease;
-  transform: translateX(-100%);
-}
-
-.nav-item:hover::before {
-  opacity: 1;
-  transform: translateX(100%);
-}
-
-.nav-item:hover {
-  color: white;
-  background-color: rgba(255, 255, 255, 0.1);
-  transform: translateX(4px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-/* Active state with gradient */
-.nav-item.active {
-  color: white;
-  background: linear-gradient(to right, rgba(37, 99, 235, 0.3), rgba(79, 70, 229, 0.3), rgba(147, 51, 234, 0.3));
-  box-shadow: 0 4px 20px rgba(79, 70, 229, 0.15);
-  border-left: 2px solid;
-  border-image: linear-gradient(to bottom, #3b82f6, #8b5cf6) 1;
-}
-
-.nav-item.active .icon {
-  transform: scale(1.1);
-  filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.5));
-}
-
-/* Submenu item styling */
-.sub-nav-item {
+.sidebar__logo-icon {
   position: relative;
+  width: 40px;
+  height: 40px;
+  background: var(--accent-gradient);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+  transition: var(--transition-base);
+}
+
+.sidebar__logo-text {
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: white;
+  letter-spacing: -0.5px;
+}
+
+.sidebar__logo-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #fff, #c4b5fd);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  white-space: nowrap;
+}
+
+/* Desktop Toggle Button */
+.sidebar__toggle {
+  position: absolute;
+  right: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  background: #1a1a1a;
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition-base);
+  z-index: 10;
+}
+
+.sidebar__toggle:hover {
+  background: #2a2a2a;
+  transform: translateY(-50%) scale(1.1);
+  border-color: rgba(255,255,255,0.3);
+}
+
+.sidebar__toggle-icon {
+  width: 12px;
+  height: 12px;
+  color: rgba(255,255,255,0.7);
+  transition: transform 0.3s;
+}
+
+.sidebar__toggle--rotated .sidebar__toggle-icon {
+  transform: rotate(180deg);
+}
+
+/* Mobile Close Button */
+.sidebar__mobile-close {
+  background: rgba(255,255,255,0.08);
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sidebar__mobile-close:hover {
+  background: rgba(255,255,255,0.15);
+}
+
+/* Navigation */
+.sidebar__nav {
+  flex: 1;
+  padding: 1.25rem 0.75rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #3b82f6 #1e1e1e;
+}
+
+.sidebar__nav::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar__nav::-webkit-scrollbar-track {
+  background: #1e1e1e;
+  border-radius: 4px;
+}
+
+.sidebar__nav::-webkit-scrollbar-thumb {
+  background: #3b82f6;
+  border-radius: 4px;
+}
+
+/* Section Titles */
+.sidebar__section-title {
+  padding: 0 0.75rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: rgba(255,255,255,0.4);
+}
+
+.sidebar__section-title--mt {
+  margin-top: 1.5rem;
+}
+
+/* Navigation Links */
+.sidebar__link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.875rem;
+  margin-bottom: 0.25rem;
+  border-radius: 14px;
+  color: var(--text-dim);
+  transition: var(--transition-base);
+  position: relative;
+  overflow: hidden;
+  text-decoration: none;
+}
+
+.sidebar__link--collapsed {
+  justify-content: center;
+  padding: 0.625rem;
+}
+
+.sidebar__link:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-bright);
+  transform: translateX(4px);
+}
+
+.sidebar__link--active {
+  background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(139,92,246,0.15));
+  color: white;
+  border-left: 2px solid #3b82f6;
+}
+
+.sidebar__link--active .sidebar__icon {
+  filter: drop-shadow(0 0 6px #3b82f6);
+}
+
+/* Group Buttons (collapsible menus) */
+.sidebar__group {
+  margin-bottom: 0.25rem;
+}
+
+.sidebar__group-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.875rem;
+  width: 100%;
+  border-radius: 14px;
+  color: var(--text-dim);
+  transition: var(--transition-base);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: inherit;
+}
+
+.sidebar__group-btn--collapsed {
+  justify-content: center;
+  padding: 0.625rem;
+}
+
+.sidebar__group-btn:hover {
+  background: rgb(255 254 254 / 54%); 
+  color: var(--text-bright);
+  transform: translateX(4px);
+}
+
+.sidebar__group-btn--active {
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+}
+
+.sidebar__icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+
+.sidebar__label {
+  flex: 1;
+  text-align: left;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: white;
+}
+
+.sidebar__chevron {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.3s;
+}
+
+.sidebar__chevron--open {
+  transform: rotate(180deg);
+}
+
+/* Badges */
+.sidebar__badge {
+  padding: 0.125rem 0.375rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.1);
+  color: white;
+}
+
+.sidebar__badge--primary { background: linear-gradient(135deg, #2563eb, #7c3aed); }
+.sidebar__badge--success { background: linear-gradient(135deg, #059669, #10b981); }
+.sidebar__badge--warning { background: linear-gradient(135deg, #ea580c, #f97316); }
+.sidebar__badge--danger { background: linear-gradient(135deg, #dc2626, #ef4444); }
+
+/* Submenu */
+.sidebar__submenu {
+  margin-left: 2.5rem;
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+  border-left: 1px dashed rgba(255,255,255,0.15);
+  padding-left: 0.75rem;
+}
+
+.sidebar__submenu--mobile {
+  margin-left: 2rem;
+  border-left-color: rgba(255,255,255,0.2);
+}
+
+.sidebar__sub-link {
   display: block;
   padding: 0.5rem 0.75rem;
-  font-size: 0.813rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.5);
-  border-radius: 0.5rem;
-  transition: all 0.2s ease;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.6);
+  border-radius: 10px;
+  transition: var(--transition-base);
+  text-decoration: none;
 }
 
-.sub-nav-item:hover {
+.sidebar__sub-link:hover {
   color: white;
-  background-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255,255,255,0.05);
   transform: translateX(4px);
 }
 
-.sub-nav-item.active-sub {
+.sidebar__sub-link--active {
   color: white;
-  background: linear-gradient(to right, rgba(37, 99, 235, 0.2), rgba(79, 70, 229, 0.2));
+  background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(139,92,246,0.15));
   border-left: 2px solid #3b82f6;
   padding-left: calc(0.75rem - 2px);
 }
 
-/* Icon styling */
-.icon {
-  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
-  transition: all 0.3s ease;
-  flex-shrink: 0;
+.sidebar__sub-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-/* Modern Badge Styles */
-.badge-modern {
+.sidebar__sub-badge {
+  background: #ef4444;
   padding: 0.125rem 0.375rem;
-  font-size: 9px;
+  border-radius: 20px;
+  font-size: 0.7rem;
   font-weight: bold;
-  color: white;
-  border-radius: 9999px;
-  margin-left: 0.5rem;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  animation: pulse 2s infinite;
-  background: linear-gradient(to right, var(--tw-gradient-from), var(--tw-gradient-to));
 }
 
-/* Modern Tooltip */
-.tooltip {
+/* Tooltips for desktop collapsed mode */
+.sidebar__tooltip {
   position: absolute;
   left: 100%;
-  margin-left: 0.5rem;
-  padding: 0.25rem 0.5rem;
-  background-color: rgb(30, 41, 59);
-  backdrop-filter: blur(16px);
-  color: white;
+  margin-left: 0.75rem;
+  background: #1a1a1a;
+  backdrop-filter: blur(8px);
+  padding: 0.25rem 0.75rem;
+  border-radius: 8px;
   font-size: 0.75rem;
-  border-radius: 0.375rem;
-  opacity: 0;
-  transition: all 0.2s ease;
   white-space: nowrap;
-  z-index: 50;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.1);
+  opacity: 0;
   pointer-events: none;
+  transition: opacity 0.2s;
+  z-index: 100;
 }
 
-.tooltip::before {
-  content: '';
-  position: absolute;
-  left: -0.25rem;
-  top: 50%;
-  transform: translateY(-50%) rotate(45deg);
-  width: 0.375rem;
-  height: 0.375rem;
-  background-color: rgb(30, 41, 59);
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.group:hover .tooltip {
+.sidebar__link--collapsed:hover .sidebar__tooltip,
+.sidebar__group-btn--collapsed:hover .sidebar__tooltip {
   opacity: 1;
 }
 
-/* Logout button */
-.logout-btn {
+/* Footer Section */
+.sidebar__footer {
+  margin-top: auto;
+  border-top: 1px solid var(--glass-border);
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.sidebar__user {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.sidebar__avatar {
   position: relative;
-  overflow: hidden;
-  color: rgba(255, 255, 255, 0.6);
-  transition: all 0.3s ease;
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(239, 68, 68, 0.05) 100%);
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.logout-btn:hover {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
   color: white;
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.1) 100%);
+  box-shadow: 0 4px 12px rgba(139,92,246,0.3);
 }
 
-/* Custom scrollbar */
-.custom-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.2) rgba(255, 255, 255, 0.05);
+.sidebar__status {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  background: #10b981;
+  border-radius: 50%;
+  border: 2px solid #000;
 }
 
-.custom-scrollbar::-webkit-scrollbar {
-  width: 3px;
+.sidebar__user-info {
+  overflow: hidden;
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 4px;
+.sidebar__user-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: white;
+  white-space: nowrap;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: linear-gradient(to bottom, #3b82f6, #8b5cf6);
-  border-radius: 4px;
+.sidebar__user-role {
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.6);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.sidebar__user-status-dot {
+  width: 6px;
+  height: 6px;
+  background: #10b981;
+  border-radius: 50%;
+  display: inline-block;
+  animation: pulse 1.5s infinite;
+}
+
+/* Logout Button */
+.sidebar__logout {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.625rem;
+  border-radius: 14px;
+  background: rgba(239, 68, 68, 0.08);
+  border: none;
+  color: rgba(255,255,255,0.7);
+  cursor: pointer;
+  transition: var(--transition-base);
+}
+
+.sidebar__logout:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: white;
+  transform: translateX(4px);
+}
+
+.sidebar__logout--collapsed {
+  justify-content: center;
+}
+
+/* Transitions */
+.fade-slide-enter-active,
+.fade-slide-leave-active,
+.submenu-enter-active,
+.submenu-leave-active,
+.fade-enter-active,
+.fade-leave-active {
+  transition: all 0.2s ease;
+}
+
+.fade-slide-enter-from,
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateX(-10px);
+}
+
+.submenu-enter-from,
+.submenu-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
 /* Animations */
-@keyframes pulse-slow {
-  0%, 100% { opacity: 0.3; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(1.1); }
+@keyframes float {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(20px, 20px) scale(1.1); }
 }
 
-@keyframes pulse-slower {
-  0%, 100% { opacity: 0.2; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(1.2); }
-}
-
-@keyframes ping-slow {
-  75%, 100% {
-    transform: scale(1.5);
-    opacity: 0;
-  }
+@keyframes pulseGlow {
+  0% { opacity: 0.1; transform: translate(-50%, -50%) scale(0.9); }
+  100% { opacity: 0.25; transform: translate(-50%, -50%) scale(1.1); }
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.2); }
 }
 
-.animate-pulse-slow {
-  animation: pulse-slow 8s ease-in-out infinite;
-}
-
-.animate-pulse-slower {
-  animation: pulse-slower 12s ease-in-out infinite;
-}
-
-.animate-ping-slow {
-  animation: ping-slow 3s cubic-bezier(0, 0, 0.2, 1) infinite;
-}
-
-/* Glass effect optimization */
-.backdrop-blur-xl {
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-}
-
-/* Center items when collapsed */
-.justify-center {
-  justify-content: center;
+/* Responsive touch adjustments */
+@media (max-width: 768px) {
+  .sidebar__group-btn,
+  .sidebar__link {
+    padding: 0.75rem 0.875rem;
+    margin-bottom: 0.5rem;
+  }
+  .sidebar__sub-link {
+    padding: 0.6rem 0.75rem;
+  }
 }
 </style>

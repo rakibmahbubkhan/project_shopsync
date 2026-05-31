@@ -50,6 +50,13 @@ const routes = [
 
       // System Logs
       { path: 'audit-logs', name: 'audit-logs', component: () => import('@/views/settings/AuditLogList.vue') },
+
+      // ... under children array of layout path: '/' ...
+      // Expenses Module
+      { path: 'expenses/categories', name: 'expense-categories', component: () => import('@/views/expenses/ExpenseCategoryList.vue'), meta: { requiresAuth: true } },
+      { path: 'expenses', name: 'expenses-list', component: () => import('@/views/expenses/ExpenseList.vue'), meta: { requiresAuth: true } },
+      { path: 'expenses/create', name: 'expense-create', component: () => import('@/views/expenses/ExpenseCreate.vue'), meta: { requiresAuth: true } },
+      { path: 'expenses/:id/edit', name: 'expense-edit', component: () => import('@/views/expenses/ExpenseCreate.vue'), meta: { requiresAuth: true } },
     ]
   },
 
